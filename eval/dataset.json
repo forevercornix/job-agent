@@ -1,0 +1,81 @@
+[
+  {"id": 1, "title": "IT Project Manager (ERP Implementation)", "company": "GlobalManufacture Ltd",
+   "snippet": "Ieškome IT projektų vadovo ERP diegimo projektui. Reikalavimai: 5+ metų patirtis valdant IT projektus, Agile/Scrum metodikos, SQL žinios, suinteresuotų šalių valdymas.",
+   "url": "https://example.test/job/1", "expected_label": "match"},
+
+  {"id": 2, "title": "Product Owner - SaaS Platform", "company": "TechStartup OU",
+   "snippet": "Reikalinga Product Owner mūsų SaaS produktui. Backlog valdymas, prioritetų nustatymas, bendradarbiavimas su Scrum komanda, roadmap planavimas.",
+   "url": "https://example.test/job/2", "expected_label": "match"},
+
+  {"id": 3, "title": "Digital Transformation Manager", "company": "Public Sector Agency",
+   "snippet": "Ieškome skaitmeninės transformacijos vadovo. PRINCE2 sertifikatas privalumas, procesų skaitmenizacijos patirtis, viešojo sektoriaus IS projektų valdymas.",
+   "url": "https://example.test/job/3", "expected_label": "match"},
+
+  {"id": 4, "title": "IT Program Manager - CRM Rollout", "company": "RetailChain Group",
+   "snippet": "CRM sistemos diegimo programos vadovas. Reikalinga: tiekėjų valdymas, suinteresuotų šalių koordinavimas, biudžeto valdymas, IT projektų patirtis.",
+   "url": "https://example.test/job/4", "expected_label": "match"},
+
+  {"id": 5, "title": "Senior Project Manager - Public Information Systems", "company": "Ministry IT Dept",
+   "snippet": "Nacionalinės informacinės sistemos projektų vadovas. BPMN procesų modeliavimas, tarpinstitucinis koordinavimas, IT valdymo patirtis būtina.",
+   "url": "https://example.test/job/5", "expected_label": "match"},
+
+  {"id": 6, "title": "Product Owner - Agile Team", "company": "FinTech Solutions",
+   "snippet": "Product Owner darbui su Agile komanda. Backlog prioritizavimas, user stories rašymas, roadmap kūrimas kartu su Product Management.",
+   "url": "https://example.test/job/6", "expected_label": "match"},
+
+  {"id": 7, "title": "IT Delivery Manager", "company": "Consulting Group",
+   "snippet": "IT paslaugų teikimo vadovas. Tiekėjų valdymas, SQL ataskaitos, klientų projektų koordinavimas, Agile pristatymo metodikos.",
+   "url": "https://example.test/job/7", "expected_label": "match"},
+
+  {"id": 8, "title": "Junior Project Coordinator", "company": "SmallOffice Ltd",
+   "snippet": "Ieškome jaunesniojo projektų koordinatoriaus. Padės vyresniems vadovams, dokumentacijos tvarkymas, susitikimų organizavimas. Be IT sistemų patirties.",
+   "url": "https://example.test/job/8", "expected_label": "maybe"},
+
+  {"id": 9, "title": "Business Analyst", "company": "DataCorp",
+   "snippet": "Verslo analitikas su SQL žiniomis. Duomenų analizė, ataskaitų rengimas, reikalavimų surinkimas. Ne projektų valdymo pozicija.",
+   "url": "https://example.test/job/9", "expected_label": "maybe"},
+
+  {"id": 10, "title": "Scrum Master", "company": "Software House",
+   "snippet": "Scrum Master komandai. Agile ceremonijų facilitavimas, kliūčių šalinimas komandai. Ne Product Owner ir ne projektų vadovo pozicija.",
+   "url": "https://example.test/job/10", "expected_label": "maybe"},
+
+  {"id": 11, "title": "IT Infrastructure Manager", "company": "DataCenter Services",
+   "snippet": "IT infrastruktūros vadovas. Serverių, tinklo administravimas, IT palaikymo komandos valdymas. Nedaug projektų valdymo, daugiau techninė infrastruktūra.",
+   "url": "https://example.test/job/11", "expected_label": "maybe"},
+
+  {"id": 12, "title": "Marketing Project Manager", "company": "AdAgency Creative",
+   "snippet": "Rinkodaros projektų vadovas. Kampanijų koordinavimas, terminų valdymas, klientų komunikacija. Projektų valdymo įgūdžiai, bet ne IT sritis.",
+   "url": "https://example.test/job/12", "expected_label": "maybe"},
+
+  {"id": 13, "title": "Product Manager (not Owner)", "company": "Consumer App Co",
+   "snippet": "Product Manager mobiliajai programėlei. Rinkos analizė, produkto strategija, bendradarbiavimas su dizaino komanda. Daugiau strateginė, mažiau operatyvinė rolė.",
+   "url": "https://example.test/job/13", "expected_label": "maybe"},
+
+  {"id": 14, "title": "Sales Representative", "company": "B2B Distribution",
+   "snippet": "Ieškome aktyvaus pardavimų atstovo B2B rinkai. Klientų paieška, derybos, pardavimų planų vykdymas.",
+   "url": "https://example.test/job/14", "expected_label": "no_match"},
+
+  {"id": 15, "title": "Warehouse Logistics Coordinator", "company": "Logistics Group",
+   "snippet": "Sandėlio logistikos koordinatorius. Prekių priėmimas, sandėliavimo organizavimas, transporto koordinavimas.",
+   "url": "https://example.test/job/15", "expected_label": "no_match"},
+
+  {"id": 16, "title": "Graphic Designer", "company": "Creative Studio",
+   "snippet": "Ieškome grafikos dizainerio. Adobe Photoshop/Illustrator, prekės ženklo vizualinė tapatybė, spausdintinės medžiagos kūrimas.",
+   "url": "https://example.test/job/16", "expected_label": "no_match"},
+
+  {"id": 17, "title": "HR Recruiter", "company": "Staffing Agency",
+   "snippet": "Personalo atrankos specialistas. Kandidatų paieška, interviu vedimas, darbo skelbimų talpinimas.",
+   "url": "https://example.test/job/17", "expected_label": "no_match"},
+
+  {"id": 18, "title": "Restaurant Manager", "company": "Hospitality Group",
+   "snippet": "Restorano vadovas. Personalo valdymas, klientų aptarnavimo kokybė, atsargų valdymas, pamainų planavimas.",
+   "url": "https://example.test/job/18", "expected_label": "no_match"},
+
+  {"id": 19, "title": "Electrician", "company": "Construction Services",
+   "snippet": "Elektrikas statybų objektams. Elektros instaliacijos, remonto darbai, saugos reikalavimų laikymasis.",
+   "url": "https://example.test/job/19", "expected_label": "no_match"},
+
+  {"id": 20, "title": "Customer Support Agent", "company": "E-commerce Platform",
+   "snippet": "Klientų aptarnavimo specialistas. Skambučių/el. laiškų apdorojimas, problemų sprendimas, CRM sistemos naudojimas kasdieniame darbe.",
+   "url": "https://example.test/job/20", "expected_label": "no_match"}
+]

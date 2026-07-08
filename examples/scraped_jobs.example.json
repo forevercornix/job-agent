@@ -1,0 +1,23 @@
+[
+  {
+    "source": "ExampleJobBoard1",
+    "title": "IT projektų vadovas",
+    "company": "UAB Pavyzdinė Įmonė",
+    "url": "https://jobs.example-one.test/job/example-1",
+    "snippet": "Ieškome IT projektų vadovo, turinčio patirties diegiant ERP/CRM sistemas, valdant Agile komandas ir koordinuojant suinteresuotas šalis. Reikalavimai: 5+ metų patirtis, PRINCE2 ar Scrum sertifikatas, SQL žinios."
+  },
+  {
+    "source": "ExampleJobBoard2",
+    "title": "Product Owner (SaaS)",
+    "company": "TechStartas LT",
+    "url": "https://www.example-two.test/vacancy/example-2",
+    "snippet": "Ieškome Product Owner mūsų SaaS produktui. Backlog valdymas, bendradarbiavimas su vystymo komanda, prioritetų nustatymas pagal verslo vertę."
+  },
+  {
+    "source": "ExampleJobBoard1",
+    "title": "Pardavimų vadybininkas",
+    "company": "Prekybos Grupė",
+    "url": "https://jobs.example-one.test/job/example-3",
+    "snippet": "Ieškome aktyvaus pardavimų vadybininko darbui su B2B klientais mažmeninės prekybos sektoriuje."
+  }
+]

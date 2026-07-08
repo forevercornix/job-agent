@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head><meta charset="utf-8"><title>Pavyzdinis darbo skelbimų sąrašas</title></head>
+<body>
+  <div id="results">
+    <a href="/job/1001" class="job-card">
+      <div>IT Projektų vadovas</div>
+      <div>UAB Pavyzdinė Įmonė</div>
+      <div>Ieškome IT projektų vadovo su Agile patirtimi.</div>
+    </a>
+    <a href="/job/1002" class="job-card">
+      <div>Product Owner</div>
+      <div>TechStartas</div>
+      <div>SaaS produkto backlog valdymas.</div>
+    </a>
+    <a href="https://external-full-url.test/job/2001" class="job-card">
+      <div>Duomenų analitikas</div>
+      <div>Analitikos Grupė</div>
+      <div>SQL, Python, ataskaitų rengimas.</div>
+    </a>
+    <!-- Dublikatas (ta pati nuoroda) - turėtų būti pašalintas jau scraper lygmenyje -->
+    <a href="/job/1001" class="job-card">
+      <div>IT Projektų vadovas (dublikatas)</div>
+      <div>UAB Pavyzdinė Įmonė</div>
+      <div>Ieškome IT projektų vadovo su Agile patirtimi.</div>
+    </a>
+    <!-- Elementas be href - turėtų būti praleistas -->
+    <article class="job-card">
+      <div>Skelbimas be nuorodos</div>
+      <div>Kažkoks pavadinimas</div>
+    </article>
+  </div>
+</body>
+</html>

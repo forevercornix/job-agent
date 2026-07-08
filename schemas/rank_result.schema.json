@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/forevercornix/job-agent/schemas/rank_result.schema.json",
+  "title": "Job Ranking Result Contract",
+  "description": "Formalus kontraktas, kurį PRIVALO atitikti ranker.score_job() galutinis (po validacijos ir grounding patikros) rezultatas. Šis failas yra 'source of truth' dokumentacija modelio atsakymo struktūrai - tests/test_schema_contract.py patikrina, kad realūs score_job() rezultatai (įskaitant klaidų atvejus) realiai atitinka šią schemą, o ne tik dokumentacija atskirai nuo kodo.",
+  "type": "object",
+  "required": ["score", "reason", "evidence", "matched_requirements", "missing_requirements", "grounded"],
+  "additionalProperties": false,
+  "properties": {
+    "score": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 10,
+      "description": "Atitikimo balas 0-10. Apkarpomas kode (max(0,min(10,...))) net jei modelis grąžintų reikšmę už ribų. Priverstinai apkarpomas iki DOWNGRADE_SCORE_CAP (3), jei 'grounded' yra false."
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "description": "1-2 sakinių paaiškinimas lietuviškai, kodėl toks balas. Klaidos atveju prasideda 'Vertinimo klaida:'."
+    },
+    "evidence": {
+      "type": "string",
+      "description": "Trumpa (iki ~15 žodžių) tiesioginė citata iš skelbimo teksto, arba tuščia eilutė. PRIVALO būti PROGRAMIŠKAI patikrinta (žr. 'grounded' lauką) - pati citata nėra pasitikima aklai."
+    },
+    "matched_requirements": {
+      "type": "array",
+      "items": {"type": "string"},
+      "maxItems": 10,
+      "description": "Trumpų frazių sąrašas - reikalavimai/technologijos, kurie skelbime MINIMI ir atitinka kandidato profilį. Gali būti tuščias."
+    },
+    "missing_requirements": {
+      "type": "array",
+      "items": {"type": "string"},
+      "maxItems": 10,
+      "description": "Trumpų frazių sąrašas - reikalavimai, kurie skelbime YRA, bet kandidato profilyje nematyti, kad juos turėtų. Gali būti tuščias."
+    },
+    "grounded": {
+      "type": "boolean",
+      "description": "PROGRAMIŠKAI apskaičiuotas laukas (ne modelio grąžintas) - ar 'evidence' citata realiai rasta skelbimo tekste (substring arba fuzzy match, žr. ranker._is_evidence_grounded). False reiškia, kad 'score' buvo priverstinai nužemintas."
+    }
+  }
+}

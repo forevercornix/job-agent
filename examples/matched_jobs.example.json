@@ -1,0 +1,36 @@
+[
+  {
+    "source": "ExampleJobBoard1",
+    "title": "IT projektų vadovas",
+    "company": "UAB Pavyzdinė Įmonė",
+    "url": "https://jobs.example-one.test/job/example-1",
+    "snippet": "Ieškome IT projektų vadovo, turinčio patirties diegiant ERP/CRM sistemas, valdant Agile komandas ir koordinuojant suinteresuotas šalis. Reikalavimai: 5+ metų patirtis, PRINCE2 ar Scrum sertifikatas, SQL žinios.",
+    "match_score": 9,
+    "match_reason": "Puikiai atitinka IT projektų valdymo patirtį, ERP/CRM diegimą ir Agile metodikas.",
+    "match_evidence": "Reikalaujama Agile komandų valdymo ir ERP/CRM diegimo patirtis",
+    "matched_requirements": [
+      "Agile komandų valdymas",
+      "ERP/CRM diegimas"
+    ],
+    "missing_requirements": [],
+    "match_grounded": true
+  },
+  {
+    "source": "ExampleJobBoard2",
+    "title": "Product Owner (SaaS)",
+    "company": "TechStartas LT",
+    "url": "https://www.example-two.test/vacancy/example-2",
+    "snippet": "Ieškome Product Owner mūsų SaaS produktui. Backlog valdymas, bendradarbiavimas su vystymo komanda, prioritetų nustatymas pagal verslo vertę.",
+    "match_score": 8,
+    "match_reason": "Product Owner patirtis SaaS aplinkoje tiesiogiai atitinka profilį, nors sritis šiek tiek siauresnė.",
+    "match_evidence": "Backlog valdymas ir prioritetų nustatymas pagal verslo vertę",
+    "matched_requirements": [
+      "Backlog valdymas",
+      "SaaS produktas"
+    ],
+    "missing_requirements": [
+      "Konkreti pramonės šaka nepatikslinta"
+    ],
+    "match_grounded": true
+  }
+]

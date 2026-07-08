@@ -1,0 +1,48 @@
+# Darbo skelbimų šaltinių konfigūracija (VIEŠA, GENERINĖ VERSIJA).
+#
+# scraper.py DINAMIŠKAI įkelia šaltinių sąrašą ir generuoja paieškos URL bei
+# ištraukia skelbimus vienai generinei funkcijai visiems šaltiniams
+# (žr. scrape_source() ir load_sources() faile scraper.py).
+#
+# SVARBU (reputacija/privatumas): šis failas sąmoningai naudoja GENERINIUS
+# pavyzdinius pavadinimus, o ne realius darbo skelbimų portalus. Realius
+# šaltinius, kuriuos naudojate patys, laikykite `sources.local.yaml` faile
+# (žr. sources.local.yaml.example šabloną) - jis yra .gitignore sąraše ir
+# niekada nepatenka į viešą repo. Priežastis: viešame CV/portfolio projekte
+# nenorime tiesiogiai nurodyti/reklamuoti, kurias konkrečias svetaines
+# automatizuotai naršome - kai kurios svetainės tai draudžia savo Paslaugų
+# teikimo sąlygose, ir tai geriau tikrintis privačiai, ne skelbti viešai.
+#
+# Kaip veikia scraper.load_sources():
+#   1. Jei egzistuoja sources.local.yaml (privatus, jūsų realūs šaltiniai) - naudojamas jis
+#   2. Priešingu atveju naudojamas šis failas (generinis demo/pavyzdys)
+#
+# Norėdami pridėti naują šaltinį, tiesiog pridėkite naują įrašą - jokio
+# Python kodo keisti nereikia (nebent svetainės HTML struktūra reikalauja
+# specifinės logikos, žr. "job_link_substring" paaiškinimą).
+
+sources:
+  - name: ExampleJobBoard1
+    base_url: "https://jobs.example-one.test"
+    search_path: "/search"
+    query_param: "keyword"
+    # Substring, pagal kurį atpažįstami skelbimo nuorodų href atributai
+    job_link_substring: "/job/"
+    notes: >
+      Pavyzdinis šaltinis Nr. 1 - demonstruoja generinę konfigūracijos
+      struktūrą. Realiems šaltiniams naudokite sources.local.yaml.
+
+  - name: ExampleJobBoard2
+    base_url: "https://www.example-two.test"
+    search_path: "/vacancies"
+    query_param: "q"
+    job_link_substring: "/vacancy/"
+    notes: >
+      Pavyzdinis šaltinis Nr. 2 - kitokia URL struktūra, parodo, kaip
+      konfigūracija prisitaiko prie skirtingų svetainių be kodo pakeitimų.
+
+# Numatytieji paieškos raktažodžiai (naudojami tik jei SEARCH_KEYWORDS env
+# kintamasis nenustatytas - žr. config.py _get_keywords()).
+example_keywords:
+  - "project manager"
+  - "product owner"

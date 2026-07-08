@@ -1,0 +1,43 @@
+# Šablonas jūsų PRIVATIEMS, realiems darbo skelbimų šaltiniams.
+#
+# Nukopijuokite šį failą į sources.local.yaml ir įrašykite realių svetainių
+# duomenis. sources.local.yaml yra .gitignore sąraše - jis NIEKADA
+# necommit'inamas ir lieka tik jūsų kompiuteryje / GitHub Actions runner'yje
+# (kur jį galite atkurti per Secret arba per repository-level failą privačiame
+# fork'e, jei automatizuojate per Actions - žr. README "Realių šaltinių
+# naudojimas GitHub Actions").
+#
+# scraper.py automatiškai naudos šį failą vietoj viešo sources.yaml, jei jis
+# egzistuoja.
+#
+# PRIEŠ NAUDOJANT: patikrinkite kiekvienos svetainės robots.txt ir Paslaugų
+# teikimo sąlygas (Terms of Service) - kai kurios svetainės aiškiai draudžia
+# automatizuotą naršymą/scraping. Žr. SECURITY.md skyrių "Web scraping ribos".
+
+sources:
+  - name: cvonline.lt
+    base_url: "https://www.cvonline.lt"
+    search_path: "/lt/search"
+    query_param: "keyword"
+    job_link_substring: "/lt/job/"
+    notes: "Didžiausias LT darbo skelbimų portalas."
+
+  - name: cv.lt
+    base_url: "https://www.cv.lt"
+    search_path: "/jobs"
+    query_param: "search"
+    job_link_substring: "/job/"
+    notes: "Mažesnis portalas, paprastesnė HTML struktūra."
+
+  - name: cvmarket.lt
+    base_url: "https://www.cvmarket.lt"
+    search_path: "/darbo-skelbimai"
+    query_param: "keyword"
+    job_link_substring: "/darbo-skelbimas/"
+    notes: "Nuotolinio darbo skelbimai, dažnai atnaujinamas turinys."
+
+example_keywords:
+  - "projektu vadovas"
+  - "IT projektu vadovas"
+  - "product owner"
+  - "digital transformation"

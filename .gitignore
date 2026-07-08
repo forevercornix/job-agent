@@ -1,0 +1,32 @@
+# Asmeniniai/jautrūs duomenys - NIEKADA nekomituoti į viešą repo
+.env
+sources.local.yaml
+
+# Vykdymo metu generuojami duomenys (atskleidžia paieškos raktažodžius ir rezultatus)
+seen_jobs.json
+matched_jobs.json
+run_manifest.json
+circuit_breaker_state.json
+email_body.txt
+log.txt
+
+# Testai / coverage / lint cache
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# Playwright
+node_modules/

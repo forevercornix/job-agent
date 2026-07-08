@@ -1,0 +1,11 @@
+playwright>=1.44
+anthropic>=0.34
+python-dotenv>=1.0
+tenacity>=8.2
+pyyaml>=6.0
+jsonschema>=4.20
+
+# Dev priklausomybės (testai, lint)
+pytest>=8.0
+pytest-cov>=5.0
+ruff>=0.5

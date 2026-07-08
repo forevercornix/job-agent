@@ -14,13 +14,10 @@
 | Parallel scraping | 3 sources |
 | CI | GitHub Actions |
 
-> ⚠️ **Prieš publikuojant viešai (pvz., jei nuoroda bus CV/portfolio) - patikrinkite:**
-> - [ ] **Nedarykite vieno "Pradinė versija" commit'o su visu kodu** - suskaidykite į logišką
->   commit istoriją. Vienas milžiniškas pirmas commit su pilnai išvystyta architektūra
->   atrodo įtartinai bet kuriam, žiūrinčiam istoriją.
-> - [ ] Jei naudosite `sources.local.yaml` su realiais šaltiniais, patikrinkite jų
+> 📌 **Pastabos, aktualios ir po publikavimo:**
+> - Jei naudosite `sources.local.yaml` su realiais šaltiniais, patikrinkite jų
 >   `robots.txt`/Paslaugų teikimo sąlygas (žr. `SECURITY.md`)
-> - [ ] Būkite pasiruošę paaiškinti **savo** architektūrinius sprendimus, ne tik kaip kodas veikia
+> - Būkite pasiruošę paaiškinti **savo** architektūrinius sprendimus, ne tik kaip kodas veikia
 
 ## Greita apžvalga
 
@@ -45,15 +42,15 @@ jokių asmeninių duomenų. Paieškos raktažodžiai ir CV profilis laikomi tik
 
 ```mermaid
 flowchart LR
-    A[GitHub Actions<br/>cron / rankinis paleidimas] --> B[Preflight Check<br/>Claude API pasiekiamumas]
-    B -->|OK| C[Scraper<br/>Playwright, lygiagretus,<br/>circuit breaker]
-    B -->|nepavyko| Z[exit 1<br/>preflight_failed]
-    C --> D[Deduplicator<br/>seen_jobs.json]
-    D --> E[LLM Ranker<br/>Claude tool-calling agentas,<br/>schema + grounding validacija]
-    E --> F[Run Manifest<br/>+ Structured Logs]
+    A[GitHub Actions] --> B[Preflight Check]
+    B -->|OK| C[Scraper]
+    B -->|nepavyko| Z[exit 1: preflight_failed]
+    C --> D[Deduplicator]
+    D --> E[LLM Ranker]
+    E --> F[Run Manifest and Logs]
     E --> G[Email Formatter]
-    G --> H[SMTP / Gmail]
-    F --> I[(run_manifest.json)]
+    G --> H[SMTP or Gmail]
+    F --> I[run_manifest.json]
 
     style Z fill:#f66,color:#fff
     style B fill:#ffd166

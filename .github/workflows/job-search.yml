@@ -1,0 +1,111 @@
+name: Darbo paieškos agentas
+
+on:
+  schedule:
+    # Paleidžia kasdien 6:00 UTC (~8:00/9:00 Lietuvos laiku, priklausomai nuo vasaros laiko)
+    - cron: "0 6 * * *"
+  workflow_dispatch: {}  # leidžia paleisti rankiniu būdu iš GitHub Actions skirtuko
+
+permissions:
+  contents: read  # jokio rašymo į repo nereikia - asmeniniai duomenys niekada necommitinami
+
+# APSAUGA NUO LENKTYNIŲ SĄLYGOS (race condition): jei rankinis paleidimas
+# (workflow_dispatch) sutaptų su suplanuotu cron paleidimu, abu procesai
+# vienu metu rašytų į seen_jobs.json/circuit_breaker_state.json per
+# actions/cache - paskutinis įrašęs "laimėtų", galimai prarandant kito
+# paleidimo duomenis. `cancel-in-progress: false` reiškia, kad naujas
+# paleidimas LAUKIA, kol baigsis ankstesnis, o ne nutraukia jį.
+concurrency:
+  group: job-search-agent
+  cancel-in-progress: false
+
+jobs:
+  run-job-search:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Repo checkout
+        uses: actions/checkout@v4
+
+      - name: Python setup
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Priklausomybių diegimas
+        run: |
+          pip install -r requirements.txt
+          playwright install --with-deps chromium
+
+      # seen_jobs.json IR circuit_breaker_state.json saugomi per Actions cache,
+      # o NE per git commit, kad viešame repo niekada neatsirastų realių
+      # paieškos rezultatų / šaltinių sveikatos istorijos
+      - name: Atkurti seen_jobs.json ir circuit_breaker_state.json iš cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            seen_jobs.json
+            circuit_breaker_state.json
+          key: agent-state-${{ github.run_id }}
+          restore-keys: |
+            agent-state-
+
+      # Realūs (privatūs) šaltiniai per Secret - žr. docs/deployment.md "Realių šaltinių
+      # naudojimas GitHub Actions". Jei SOURCES_LOCAL_YAML Secret nenustatytas,
+      # šis žingsnis tiesiog nesukuria failo, ir scraper.py naudoja viešą
+      # generinį sources.yaml (demo šaltiniai).
+      - name: Atkurti privačius šaltinius (sources.local.yaml) iš Secret
+        if: ${{ secrets.SOURCES_LOCAL_YAML != '' }}
+        env:
+          SOURCES_LOCAL_YAML: ${{ secrets.SOURCES_LOCAL_YAML }}
+        run: echo "$SOURCES_LOCAL_YAML" > sources.local.yaml
+
+      - name: Paleisti darbo paieškos agentą
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SEARCH_KEYWORDS: ${{ secrets.SEARCH_KEYWORDS }}
+          CANDIDATE_PROFILE: ${{ secrets.CANDIDATE_PROFILE }}
+          MIN_MATCH_SCORE: ${{ secrets.MIN_MATCH_SCORE }}
+          LOG_FORMAT: json  # struktūrizuoti JSON logai - lengviau grep/jq analizuoti Actions loguose
+        run: python main.py
+
+      - name: Paruošti el. laiško tekstą
+        run: python format_email.py
+
+      - name: Patikrinti, ar yra ką siųsti
+        id: check_body
+        run: |
+          if [ -s email_body.txt ]; then
+            echo "has_content=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_content=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Siųsti rezultatus el. paštu
+        if: steps.check_body.outputs.has_content == 'true'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.MAIL_SERVER }}
+          server_port: ${{ secrets.MAIL_PORT }}
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "Darbo paieškos agentas – nauji tinkami skelbimai"
+          to: ${{ secrets.MAIL_TO }}
+          from: Darbo paieškos agentas
+          body: file://email_body.txt
+
+      # PASTABA: viešame repo bet kuris prisijungęs GitHub vartotojas gali
+      # atsisiųsti šį artefaktą (GitHub taisyklė - "read access" = visi viešam
+      # repo). Jei el. laiškas jau siunčiamas aukščiau, šis žingsnis nebūtinas -
+      # palikite jį tik jei norite ir papildomos kopijos Actions skirtuke.
+      - name: Rezultatų įkėlimas kaip artefaktas
+        uses: actions/upload-artifact@v4
+        with:
+          name: matched-jobs-${{ github.run_number }}
+          path: |
+            matched_jobs.json
+            run_manifest.json
+            circuit_breaker_state.json
+          if-no-files-found: ignore
+          retention-days: 30

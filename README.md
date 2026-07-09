@@ -14,10 +14,6 @@
 | Parallel scraping | 3 sources |
 | CI | GitHub Actions |
 
-> 📌 **Pastabos, aktualios ir po publikavimo:**
-> - Jei naudosite `sources.local.yaml` su realiais šaltiniais, patikrinkite jų
->   `robots.txt`/Paslaugų teikimo sąlygas (žr. `SECURITY.md`)
-
 ## Greita apžvalga
 
 **LLM-assisted job search automation** (AI-powered job matching workflow) —

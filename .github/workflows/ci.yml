@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+# Naujas push į tą pačią šaką atšaukia ankstesnį dar vykdomą CI paleidimą -
+# CI neturi bendros persistuojamos būsenos (skirtingai nuo job-search.yml),
+# tad čia saugu naudoti cancel-in-progress ir taupyti Actions minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Repo checkout
+        uses: actions/checkout@v4
+
+      - name: Python setup
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Priklausomybių diegimas
+        run: |
+          pip install -r requirements.txt
+          playwright install --with-deps chromium
+
+      - name: Ruff (lint)
+        run: ruff check .
+
+      - name: Pytest su coverage
+        run: pytest -v --cov=. --cov-report=term-missing --cov-report=xml --cov-fail-under=85
+
+      - name: Coverage ataskaitos įkėlimas kaip artefaktas
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+          if-no-files-found: ignore
+          retention-days: 30

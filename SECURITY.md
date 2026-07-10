@@ -14,8 +14,12 @@ turėtumėte žinoti prieš jį paleisdami ar publikuodami viešai.
 - Lokaliai: visi jautrūs duomenys laikomi `.env` faile, kuris yra `.gitignore` sąraše
 - GitHub Actions: duomenys laikomi kaip **Secrets** (Settings → Secrets and
   variables → Actions), o ne workflow faile ar kode
-- GitHub automatiškai maskuoja Secrets reikšmes `***` simboliais visuose
-  workflow logų išvestyse — net jei per klaidą jas atspausdintumėte
+- GitHub bando maskuoti tikslias Secrets reikšmes `***` simboliais workflow
+  logų išvestyje, net jei per klaidą jas atspausdintumėte. **Tai nėra
+  absoliuti garantija** — pakaitalas saugiam logų/workflow projektavimui, ne
+  jo pakeitimas: transformuota, dalimis ar kitaip užkoduota (pvz., base64)
+  reikšmė gali NEBŪTI atpažinta ir maskuota. Nespausdinkite Secrets reikšmių
+  sąmoningai, net su transformacijomis.
 
 **Jei raktas atsitiktinai pateko į git istoriją:**
 1. Nedelsiant anuliuokite (revoke) raktą per Anthropic/Google konsolę

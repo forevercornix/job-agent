@@ -11,7 +11,9 @@ valdoma LOG_FORMAT aplinkos kintamuoju). Galutinė žmogui skaitoma santrauka
 vis tiek atspausdinama per manifest.print_summary().
 """
 
+import argparse
 import json
+import os
 import sys
 from datetime import datetime
 
@@ -23,6 +25,54 @@ from ranker import preflight_check, rank_jobs
 from scraper import load_sources, scrape_all
 
 logger = get_logger(__name__)
+
+
+def run_demo() -> None:
+    """
+    DEMO REŽIMAS: sugeneruoja PILNĄ el. laiško rezultato pavyzdį per KELIAS
+    SEKUNDES, NENAUDOJANT jokio realaus Playwright scraping ar Claude API
+    kvietimo - duomenys imami iš `examples/matched_jobs.example.json`
+    (statinis, iš anksto paruoštas pavyzdys, ne gyvas rezultatas).
+
+    PASKIRTIS: leisti bet kam, klonavusiam šį repo, per 1 komandą pamatyti,
+    kaip atrodo GALUTINIS pipeline rezultatas (el. laiško formatas, laukai,
+    struktūra), NEREIKALAUJANT ANTHROPIC_API_KEY, interneto ryšio, ar
+    sukonfigūruotų realių šaltinių. Tai NĖRA realaus scraping/vertinimo
+    demonstracija - tai tik IŠVESTIES FORMATO demonstracija.
+    """
+    print("=== DEMO REŽIMAS - pavyzdiniai duomenys, BE realaus scraping/Claude API kvietimo ===\n")
+
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    examples_path = os.path.join(base_dir, "examples", "matched_jobs.example.json")
+
+    with open(examples_path, "r", encoding="utf-8") as f:
+        demo_jobs = json.load(f)
+
+    with open("demo_matched_jobs.json", "w", encoding="utf-8") as f:
+        json.dump(demo_jobs, f, ensure_ascii=False, indent=2)
+
+    import format_email
+    html_body = format_email.format_email_body_html(jobs=demo_jobs)
+    with open("demo_email_preview.html", "w", encoding="utf-8") as f:
+        f.write(html_body or "")
+
+    text_body_lines = [
+        f"[{job['match_score']}/10] {job['title']} @ {job['company']} ({job['source']})"
+        for job in demo_jobs
+    ]
+
+    print(f"Rasta {len(demo_jobs)} pavyzdinių (NE realių) tinkamų skelbimų:\n")
+    for line in text_body_lines:
+        print(f"  {line}")
+
+    print("\nSugeneruoti failai (pavyzdiniai, ne realaus paleidimo rezultatai):")
+    print("  - demo_matched_jobs.json")
+    print("  - demo_email_preview.html")
+    print(
+        "\nPASTABA: tai PAVYZDINIAI duomenys iš examples/matched_jobs.example.json, "
+        "NE realaus scraping/Claude API vertinimo rezultatas. Realiam paleidimui "
+        "naudokite 'python main.py' (be --demo) su sukonfigūruotu ANTHROPIC_API_KEY."
+    )
 
 
 def main() -> RunManifest:
@@ -146,7 +196,20 @@ def main() -> RunManifest:
 if __name__ == "__main__":
     from manifest import CRITICAL_STATUSES
 
+    parser = argparse.ArgumentParser(description="Darbo paieškos agentas")
+    parser.add_argument(
+        "--demo", action="store_true",
+        help="DEMO režimas: sugeneruoja pavyzdinį el. laiško rezultatą iš "
+             "examples/ duomenų, BE realaus scraping ar Claude API kvietimo "
+             "(nereikia ANTHROPIC_API_KEY ar interneto ryšio).",
+    )
+    args = parser.parse_args()
+
     setup_logging()  # LOG_FORMAT env kintamasis nustato json/console formatą
+
+    if args.demo:
+        run_demo()
+        sys.exit(0)
 
     result_manifest = main()
     # Nenulinis exit code kritinėms klaidoms - GitHub Actions (ir bet kuris

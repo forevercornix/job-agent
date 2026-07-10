@@ -8,11 +8,16 @@
 |---|---|
 | Python | ~1 840 LOC (be testų) |
 | Tests | 173 |
-| Coverage | 92.8% |
+| Coverage | 92.9% |
 | Sources | Configurable (`sources.yaml`) |
 | LLM | Claude, Tool Use |
 | Parallel scraping | 3 sources |
 | CI | GitHub Actions |
+
+> 📌 **Pastabos, aktualios ir po publikavimo:**
+> - Jei naudosite `sources.local.yaml` su realiais šaltiniais, patikrinkite jų
+>   `robots.txt`/Paslaugų teikimo sąlygas (žr. `SECURITY.md`)
+> - Būkite pasiruošę paaiškinti **savo** architektūrinius sprendimus, ne tik kaip kodas veikia
 
 ## Greita apžvalga
 
@@ -22,10 +27,14 @@ atitikimą kandidato profiliui per Claude API su struktūrizuota, validuojama
 išvestimi, ir atsiunčia santrauką el. paštu — pilnai automatizuotas per
 GitHub Actions.
 
-**Šis projektas paruoštas viešam repo/portfolio naudojimui** — kodas nesaugo
-jokių asmeninių duomenų. Paieškos raktažodžiai ir CV profilis laikomi tik
-`.env` faile (lokaliai) arba GitHub Secrets (Actions) — niekada git istorijoje
-(žr. `.gitignore` ir `SECURITY.md`).
+**Šis projektas paruoštas viešam repo/portfolio naudojimui** — pagal numatytąją
+konfigūraciją asmeniniai duomenys (paieškos raktažodžiai, CV profilis) laikomi
+aplinkos kintamuosiuose (`.env` lokaliai) arba GitHub Secrets (Actions), o ne
+kode ar YAML faile, kuris būtų commit'inamas. **Svarbu suprasti ribą**: tai
+priklauso nuo to, kaip PATYS naudojate repo — `.gitignore` neapsaugo failo,
+kuris jau buvo `git add`'intas anksčiau, ir niekas techniškai negali
+garantuoti, kad vartotojas neįkels `.env`/logų/rezultatų atsitiktinai (žr.
+`SECURITY.md`).
 
 **Known Limitations (4 svarbiausi punktai — pilnas sąrašas `docs/limitations.md`):**
 - Scraperiai gali lūžti, kai svetainė pakeičia DOM/HTML struktūrą
@@ -83,7 +92,8 @@ lentele ir klaidų valdymo aprašymu — **`docs/architecture.md`**.
 - 📬 Automatiškai siunčia rezultatų santrauką el. paštu (tik jei rasta atitikimų)
 - 🔂 Praleidžia jau anksčiau matytus skelbimus (deduplikacija tarp paleidimų)
 - ⏰ Pilnai automatizuotas per GitHub Actions (kasdienis grafikas, be serverio)
-- 🔒 Privatumu pagrįsta architektūra — asmeniniai duomenys niekada kode
+- 🔒 Privatumu pagrįsta architektūra pagal numatytąją konfigūraciją —
+  asmeniniai duomenys laikomi env/Secrets, nebūtinai kode (žr. ribas aukščiau)
 - 🛡️ Prompt injection apsauga - scraped skelbimų turinys aiškiai atskirtas nuo
   instrukcijų (`system`/`user` API atskyrimas + `<untrusted_job_posting>` žymos)
 - 🕵️ Vieša versija naudoja generinius demo šaltinius (`sources.yaml`); realūs
@@ -95,7 +105,7 @@ lentele ir klaidų valdymo aprašymu — **`docs/architecture.md`**.
 - 💰 Cost control — seen jobs praleidžiami prieš API kvietimą, max chars per
   skelbimą, max jobs per paleidimą, API kvietimai loginami manifeste (žr.
   `docs/cost-control.md`)
-- ✅ 173 testai (pytest), 92.8% coverage, realus DOM parsinimas su Chromium,
+- ✅ 187 testai (pytest), 92.9% coverage, realus DOM parsinimas su Chromium,
   subprocess integracinis testas, `ruff` lint, CI workflow (žr. `docs/testing.md`)
 
 ## Quick Start

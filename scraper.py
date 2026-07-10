@@ -16,6 +16,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import quote_plus
 
 import yaml
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
@@ -69,12 +70,23 @@ def build_search_url(source: dict, keyword: str) -> str:
     """
     Pagal šaltinio konfigūraciją ir raktažodį sudaro pilną paieškos URL.
 
+    Palaiko neprivalomą "extra_query" lauką - fiksuotą papildomą query string
+    dalį (pvz., "limit=20&offset=0"), kurios reikia kai kurioms svetainėms
+    (pvz., cvonline.lt naudoja "keywords[0]=..." vietoj paprasto "keyword=...",
+    kartu su limit/offset parametrais).
+
     Grynoji (pure) funkcija - lengva testuoti be naršyklės (žr. tests/).
     """
     base = source["base_url"].rstrip("/")
     path = source["search_path"]
     param = source["query_param"]
-    return f"{base}{path}?{param}={quote_plus(keyword)}"
+    url = f"{base}{path}?{param}={quote_plus(keyword)}"
+
+    extra_query = source.get("extra_query")
+    if extra_query:
+        url += f"&{extra_query}"
+
+    return url
 
 
 def _slow_scroll(page, steps=4, pause=0.4):
@@ -140,9 +152,28 @@ def _load_page_with_retry(page, url: str):
     Bando atidaryti puslapį iki 3 kartų su eksponentiniu backoff (2s, 4s, 8s...),
     jei nepavyksta dėl laikino tinklo/timeout klaidos. Po 3 nesėkmingų bandymų
     išimtis keliama toliau (reraise=True), kad ją sugautų scrape_source().
+
+    SVARBU: page.goto() (pats puslapio įkėlimas) IR "networkidle" laukimas
+    (visas foninis tinklo aktyvumas nutrūko) tvarkomi ATSKIRAI. Kai kurios
+    šiuolaikinės svetainės (SPA su pokalbių valdikliais, analitikos/pranešimų
+    signalais) NIEKADA nepasiekia "networkidle" - foninis tinklo aktyvumas
+    tęsiasi be galo, nors pats puslapio turinys jau seniai įsikrovęs. Jei
+    page.goto() PAVYKO, bet "networkidle" laukimas baigėsi timeout'u, tai
+    NELAIKOMA klaida - DOM turinys tikriausiai jau yra, tęsiame toliau.
+    Jei nepavyksta PATS goto() (realus tinklo/DNS/connection timeout), tai
+    LIEKA tikra klaida ir keliama toliau įprastam retry.
     """
     page.goto(url, timeout=30000)
-    page.wait_for_load_state("networkidle", timeout=15000)
+    try:
+        page.wait_for_load_state("networkidle", timeout=15000)
+    except PlaywrightTimeoutError:
+        logger.warning(
+            "Puslapis įsikrovė, bet 'networkidle' nepasiekta per 15s - "
+            "tikėtina, kad svetainė turi nuolatinį foninį tinklo aktyvumą "
+            "(pokalbio valdiklis, analitika ir pan.). Tęsiama toliau, nes "
+            "DOM turinys tikriausiai jau įkeltas.",
+            extra={"url": url},
+        )
 
 
 def fetch_page_text(url: str, max_chars: int = 3000) -> str:

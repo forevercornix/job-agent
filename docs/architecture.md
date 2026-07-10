@@ -272,6 +272,19 @@ trumpo anonso nepakanka:
 
 ## Galimi patobulinimai (neįgyvendinta šioje versijoje)
 
+- **Plokščia modulių struktūra repo šaknyje** (`main.py`, `ranker.py`,
+  `scraper.py`, `manifest.py`, `deduplicator.py`, `circuit_breaker.py`,
+  `logging_config.py` ir kt. - visi vienoje vietoje, ne `src/job_agent/`
+  paketo struktūroje su pakatalogiais `scraping/`, `ranking/`,
+  `notifications/`, `observability/`). Tai **sąmoningai NEpataisyta** šioje
+  versijoje - projekto dydžiui (9 moduliai, ~1840 LOC) plokščia struktūra
+  vis dar valdoma, o pilnas perkėlimas į `src/` paketą pareikalautų
+  atnaujinti visus importus, testus, CI workflow ir GitHub Actions kelius
+  vienu metu, be galimybės realiai patikrinti visos grandinės (įskaitant
+  GitHub Actions aplinką) prieš pateikiant pakeitimą - rizika sugadinti
+  veikiantį pipeline nusveria naudą šiame etape. Jei projektas augtų
+  (10+ modulių, keli tiekėjai, keli pipeline variantai), toks
+  restruktūrizavimas taptų pateisinamas.
 - Svertinis (weighted) scoring vietoj vieno bendro balo — žr. `docs/scoring.md`
 - `sources.yaml` šiuo metu naudoja generinius CSS selektorius visiems šaltiniams
   (`job_link_substring` filtruoja pagal href); jei svetainės HTML struktūra

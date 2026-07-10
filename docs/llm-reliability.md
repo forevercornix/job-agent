@@ -40,6 +40,18 @@ perfrazavo). Jei citata nerandama (modelis ją "sugalvojo" arba tiesiog
 nepateikė) → **balas priverstinai nužeminamas** iki `DOWNGRADE_SCORE_CAP`
 (numatyta: 3/10), **nepriklausomai nuo to, ką modelis parašė "reason" lauke**.
 
+**TIKSLI TERMINOLOGIJA (svarbu neperdėti, ką ši patikra realiai garantuoja)**:
+tai **"evidence PRESENCE validation"** (citatos EGZISTAVIMO patikra), o NE
+**"semantic entailment validation"** (loginio pagrįstumo patikra). Konkrečiai:
+- Patikra patvirtina, kad citata **egzistuoja** skelbimo tekste
+- Patikra **NEPATVIRTINA**, kad citata yra **reikšminga** vertinimui, kad
+  `reason` **logiškai išplaukia** iš citatos, ar kad citata **tikrai susijusi**
+  su kandidato profiliu (modelis galėtų pacituoti tikrą, bet nereikšmingą
+  frazę, ir vis tiek "pereiti" šią patikrą, jei citata pati savaime yra tekste)
+- Fuzzy match (žr. `fuzzy_threshold=0.8`) reiškia, kad priimama ne tik
+  TIKSLI citata, bet ir šiek tiek perfrazuota - tai sąmoningas kompromisas
+  tarp griežtumo ir praktiškumo, ne absoliuti "tik pažodinė citata" garantija
+
 Konkretus scenarijus (aukštas balas + nepagrįsta citata):
 ```python
 # Modelis grąžina: {"score": 9, "reason": "Puikiai tinka!",

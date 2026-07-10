@@ -23,10 +23,10 @@ jobs:
 
     steps:
       - name: Repo checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Python setup
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -41,9 +41,22 @@ jobs:
       - name: Pytest su coverage
         run: pytest -v --cov=. --cov-report=term-missing --cov-report=xml --cov-fail-under=85
 
+      # DEMO REŽIMO SMOKE TESTAS: realiai paleidžia `python main.py --demo`
+      # BE ANTHROPIC_API_KEY (sąmoningai nenustatytas šiame žingsnyje) ir
+      # patikrina, kad abu išvesties failai realiai sugeneruojami. Tai
+      # automatiškai patvirtina KIEKVIENĄ push/PR, kad demo režimas realiai
+      # veikia, o ne tik "veikė vieną kartą lokaliai paleidus".
+      - name: Demo režimo patikra (be API rakto)
+        run: |
+          unset ANTHROPIC_API_KEY
+          python main.py --demo
+          test -f demo_matched_jobs.json
+          test -f demo_email_preview.html
+          echo "Demo režimas veikia - abu failai sugeneruoti be API rakto."
+
       - name: Coverage ataskaitos įkėlimas kaip artefaktas
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: coverage.xml

@@ -86,19 +86,30 @@ gali būti tiesiog blogas, ir niekas negali to lengvai patikrinti.
 
 **Sprendimas**: privalomas `evidence` laukas priverčia modelį arba (a)
 pacituoti konkretų skelbimo teksto fragmentą, kuris pagrindžia balą, arba
-(b) aiškiai įvardyti, ko konkrečiai trūksta. Tai **nepašalina** galimybės,
+(b) palikti tuščią, jei nėra ką pacituoti. Tai **nepašalina** galimybės,
 kad modelis vis tiek blogai įvertins atitikimą, bet padaro sprendimą
 **patikrinamą** - žmogus gali palyginti `evidence` su realiu skelbimo tekstu
 per kelias sekundes, vietoj to, kad tikėtų neverifikuojamu "Puikiai tinka".
 
+**TIKSLI TERMINOLOGIJA (svarbu neperdėti garantijos)**: ši patikra yra
+**"evidence PRESENCE validation"** (citatos egzistavimo patikra), o NE
+**"semantic entailment validation"** (loginio pagrįstumo patikra). Patikra
+patvirtina, kad citata **egzistuoja** skelbimo tekste - ji NEPATVIRTINA, kad
+citata yra **reikšminga** vertinimui, ar kad `reason` **logiškai išplaukia**
+iš citatos. Modelis teoriškai galėtų pacituoti tikrą, bet nereikšmingą
+frazę, ir vis tiek "pereiti" šią patikrą.
+
 **Apdorojimas kode** (`ranker.score_job`):
-- Jei `evidence` laukas trūksta arba tuščias, balas **NEnuneigiamas**
-  (score lieka toks, koks yra) - tai būtų per griežta bausmė vien dėl
-  formato nuokrypio, ne turinio problemos
-- Vietoj to, `evidence` pakeičiamas placeholder'iu ("(nepateikta - žr.
-  logus)"), ir užloginamas WARNING lygio įrašas - matoma stebėsenoje
-  (`LOG_FORMAT=json` + grep/jq), kiek % vertinimų neatitinka GROUNDING
-  taisyklės
+- Jei `evidence` PROGRAMIŠKAI nerandama skelbimo tekste (nei tiksliu, nei
+  fuzzy match, žr. `_is_evidence_grounded`) - balas **priverstinai
+  nužeminamas** iki `DOWNGRADE_SCORE_CAP` (numatyta: 3/10), **nepriklausomai
+  nuo to, ką modelis parašė "reason" lauke**. Tai NĖRA vien perspėjimas be
+  pasekmių - balas realiai keičiasi.
+- Jei `evidence` tuščias (modelis sąžiningai neturėjo ką pacituoti),
+  taikoma ta pati downgrade taisyklė, ir `evidence` pakeičiamas placeholder'iu
+  ("(nepateikta - žr. logus)")
+- Abiem atvejais užloginamas WARNING lygio įrašas - matoma stebėsenoje
+  (`LOG_FORMAT=json` + grep/jq), kiek % vertinimų buvo nužeminti
 
 **Kur matoma**: `evidence` laukas keliauja per `rank_jobs()` į
 `job["match_evidence"]`, ir rodomas tiek el. laiško tekste, tiek HTML

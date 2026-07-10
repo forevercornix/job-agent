@@ -55,11 +55,17 @@ jobs:
       # naudojimas GitHub Actions". Jei SOURCES_LOCAL_YAML Secret nenustatytas,
       # šis žingsnis tiesiog nesukuria failo, ir scraper.py naudoja viešą
       # generinį sources.yaml (demo šaltiniai).
+      #
+      # PASTABA: `secrets` konteksto NEGALIMA naudoti tiesiogiai `if:` sąlygoje
+      # (GitHub Actions apribojimas - "Unrecognized named-value: secrets").
+      # Todėl patikra atliekama shell scripte per aplinkos kintamąjį, o ne `if:`.
       - name: Atkurti privačius šaltinius (sources.local.yaml) iš Secret
-        if: ${{ secrets.SOURCES_LOCAL_YAML != '' }}
         env:
           SOURCES_LOCAL_YAML: ${{ secrets.SOURCES_LOCAL_YAML }}
-        run: echo "$SOURCES_LOCAL_YAML" > sources.local.yaml
+        run: |
+          if [ -n "$SOURCES_LOCAL_YAML" ]; then
+            echo "$SOURCES_LOCAL_YAML" > sources.local.yaml
+          fi
 
       - name: Paleisti darbo paieškos agentą
         env:
@@ -82,8 +88,24 @@ jobs:
             echo "has_content=false" >> "$GITHUB_OUTPUT"
           fi
 
+      # Ta pati priežastis kaip aukščiau - `secrets` negalima tiesiogiai `if:`,
+      # tad patikriname MAIL_SERVER buvimą per env+shell, rezultatą įrašome
+      # kaip step output, ir TIK JĮ naudojame kito žingsnio `if:` sąlygoje.
+      - name: Patikrinti, ar sukonfigūruotas el. paštas
+        id: check_mail
+        env:
+          MAIL_SERVER: ${{ secrets.MAIL_SERVER }}
+        run: |
+          if [ -n "$MAIL_SERVER" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Siųsti rezultatus el. paštu
-        if: steps.check_body.outputs.has_content == 'true' && secrets.MAIL_SERVER != ''
+        # Siunčiama TIK jei (a) yra ką siųsti IR (b) el. paštas sukonfigūruotas
+        # (žr. "Patikrinti, ar sukonfigūruotas el. paštas" žingsnį aukščiau).
+        if: steps.check_body.outputs.has_content == 'true' && steps.check_mail.outputs.configured == 'true'
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: ${{ secrets.MAIL_SERVER }}

@@ -102,6 +102,9 @@ lentele ir klaidų valdymo aprašymu — **`docs/architecture.md`**.
   nuo "agentas veikė, bet nieko naujo nerado"; teisingas exit code CI/cron sistemoms
 - 📊 Struktūrizuotas (JSON) logging (`LOG_FORMAT=json`), lengva analizuoti
   log agregavimo sistemose; numatytas žmogui skaitomas formatas lokaliai
+- 🎬 **`--demo` režimas** — pilnas pipeline išvesties formatas per <1s, be
+  API rakto, be interneto, be naršyklės diegimo (`python main.py --demo`);
+  patikrinamas automatiškai per CI kiekvieną push (žr. `ci.yml`)
 - 💰 Cost control — seen jobs praleidžiami prieš API kvietimą, max chars per
   skelbimą, max jobs per paleidimą, API kvietimai loginami manifeste (žr.
   `docs/cost-control.md`)
@@ -110,16 +113,27 @@ lentele ir klaidų valdymo aprašymu — **`docs/architecture.md`**.
 
 ## Quick Start
 
-```bash
-# 1. Diegimas
-pip install -r requirements.txt
-playwright install chromium
+**1. Pamatykite pilną rezultato formatą per 30 sekundžių — be API rakto, be naršyklės diegimo:**
 
-# 2. Konfigūracija
+```bash
+git clone https://github.com/forevercornix/job-agent.git
+cd job-agent
+pip install -r requirements.txt   # tik Python paketai - playwright naršyklės ČIA dar nereikia
+python main.py --demo
+```
+
+Tai sugeneruoja **realų** `demo_email_preview.html` (atidarykite naršyklėje) ir
+`demo_matched_jobs.json` iš `examples/matched_jobs.example.json` — pavyzdinių,
+bet realistiškų duomenų. **Nereikia** `ANTHROPIC_API_KEY`, interneto ryšio, ar
+jokios konfigūracijos. Tai NĖRA realaus scraping/vertinimo rezultatas — tik
+IŠVESTIES FORMATO demonstracija, kad matytumėte visą pipeline "iš karto".
+
+**2. Realiam paleidimui** (tikras scraping + Claude vertinimas):
+
+```bash
+playwright install chromium        # dabar reikalinga naršyklė
 cp .env.example .env
 # ... įrašykite ANTHROPIC_API_KEY, SEARCH_KEYWORDS, CANDIDATE_PROFILE ...
-
-# 3. Paleidimas
 python main.py
 ```
 

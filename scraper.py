@@ -11,6 +11,7 @@ Paleidimui reikia: pip install playwright && playwright install chromium
 """
 
 import os
+import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import quote_plus
@@ -97,23 +98,40 @@ def _slow_scroll(page, steps=4, pause=0.4):
 
 
 def _extract_jobs_from_page(page, source: dict, max_results: int) -> list:
-    """Ištraukia skelbimus iš jau užkrauto paieškos puslapio."""
-    link_substring = source["job_link_substring"]
-    base_url = source["base_url"].rstrip("/")
+    """
+    Ištraukia skelbimus iš jau užkrauto paieškos puslapio.
 
-    # TODO: patikrinkite realų skelbimo kortelės selektorių Dev Tools įrankyje,
-    # jei šis generinis selektorius nesuranda skelbimų jūsų svetainėje
-    cards = page.query_selector_all(
-        f"a[href*='{link_substring}'], article, div[class*='JobCard'], div[class*='job-item']"
-    )
+    Palaiko DVI alternatyvias skelbimo nuorodų atpažinimo strategijas:
+    - "job_link_substring": paprastas substring match href atribute (greitas,
+      tinka svetainėms su aiškiu katalogo prefiksu, pvz. "/job/", "/lt/job/")
+    - "job_link_regex": Python regex, tikrinamas KIEKVIENAM <a> elementui
+      Python pusėje (lėčiau, bet reikalingas svetainėms be bendro prefikso,
+      kur skelbimo URL tiesiog "{aprasomasis-slugas}-{skaitmeninis-id}" prie
+      pat domeno šaknies, pvz. cv.lt: ".../produktu-vadovas-...-428799032")
+    Naudojama TIK VIENA iš dviejų (regex turi pirmenybę, jei abu nurodyti).
+    """
+    base_url = source["base_url"].rstrip("/")
+    job_link_regex = source.get("job_link_regex")
+
+    if job_link_regex:
+        pattern = re.compile(job_link_regex)
+        all_links = page.query_selector_all("a[href]")
+        cards = [link for link in all_links if link.get_attribute("href") and pattern.search(link.get_attribute("href"))]
+    else:
+        link_substring = source["job_link_substring"]
+        # TODO: patikrinkite realų skelbimo kortelės selektorių Dev Tools įrankyje,
+        # jei šis generinis selektorius nesuranda skelbimų jūsų svetainėje
+        cards = page.query_selector_all(
+            f"a[href*='{link_substring}'], article, div[class*='JobCard'], div[class*='job-item']"
+        )
 
     results = []
     seen_urls = set()
     for card in cards[:max_results]:
         try:
             href = card.get_attribute("href")
-            if not href:
-                link_el = card.query_selector(f"a[href*='{link_substring}']")
+            if not href and not job_link_regex:
+                link_el = card.query_selector(f"a[href*='{source.get('job_link_substring', '')}']")
                 href = link_el.get_attribute("href") if link_el else None
             if not href or href in seen_urls:
                 continue

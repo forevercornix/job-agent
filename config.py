@@ -63,7 +63,13 @@ COURTESY_PAUSE_SECONDS = float(os.environ.get("COURTESY_PAUSE_SECONDS", "2"))
 # skelbimų, ar sugedęs deduplikacijos loginė), likusieji tiesiog paliekami
 # kitam paleidimui, o ne visi iškart nusiunčiami Claude - apsauga nuo
 # netikėto API kaštų šuolio. Žr. main.py ir docs/cost-control.md.
-MAX_JOBS_PER_RUN = int(os.environ.get("MAX_JOBS_PER_RUN", "50"))
+#
+# PASTABA: sumažinta nuo 50 iki 30 po realaus testavimo - su realiais
+# šaltiniais (ne demo) vienas paleidimas gali rasti šimtus skelbimų, o kai
+# kurie vertinimai kviečia get_full_job_description įrankį (papildomas
+# puslapio atidarymas, ~iki 15s kiekvienam) - didelis kiekis + tool use
+# gali viršyti GitHub Actions workflow timeout (žr. job-search.yml).
+MAX_JOBS_PER_RUN = int(os.environ.get("MAX_JOBS_PER_RUN", "30"))
 
 # Failas, kuriame saugomi jau matyti skelbimų ID/nuorodos (kad nekartotų)
 SEEN_JOBS_FILE = "seen_jobs.json"

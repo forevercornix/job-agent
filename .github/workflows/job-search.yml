@@ -83,7 +83,7 @@ jobs:
           fi
 
       - name: Siųsti rezultatus el. paštu
-        if: steps.check_body.outputs.has_content == 'true'
+        if: steps.check_body.outputs.has_content == 'true' && secrets.MAIL_SERVER != ''
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: ${{ secrets.MAIL_SERVER }}

@@ -155,7 +155,10 @@ def _call_claude(system: str, messages: list, model: str, tools: list = None):
     """
     kwargs = {
         "model": model,
-        "max_tokens": 600,  # didesnis nei anksčiau - papildomi structured output laukai
+        "max_tokens": 1024,  # padidinta nuo 600 - realiame paleidime pastebėta
+        # JSON nutrūkimo klaidų ("Expecting value", "Expecting ',' delimiter"),
+        # tikėtina dėl per mažos ribos su ilgesniais matched/missing_requirements
+        # sąrašais ir ilgesniais reason/evidence laukais
         "temperature": 0,
         "system": system,
         "messages": messages,

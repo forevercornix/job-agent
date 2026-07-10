@@ -2,8 +2,10 @@ name: Darbo paieškos agentas
 
 on:
   schedule:
-    # Paleidžia kasdien 6:00 UTC (~8:00/9:00 Lietuvos laiku, priklausomai nuo vasaros laiko)
-    - cron: "0 6 * * *"
+    # Paleidžia kas savaitę ANTRADIENIAIS 6:00 UTC (~8:00/9:00 Lietuvos laiku,
+    # priklausomai nuo vasaros laiko). Cron day-of-week: 2 = antradienis
+    # (0=sekmadienis, 1=pirmadienis, 2=antradienis, ... 6=šeštadienis).
+    - cron: "0 6 * * 2"
   workflow_dispatch: {}  # leidžia paleisti rankiniu būdu iš GitHub Actions skirtuko
 
 permissions:

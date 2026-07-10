@@ -3,7 +3,7 @@
 ```bash
 pip install pytest pytest-cov ruff
 playwright install chromium   # reikalinga fixture-based scraping testams
-pytest -v          # 173 testai: deduplikacija, ranker agent loop (mock'intas
+pytest -v          # 187 testai: deduplikacija, ranker agent loop (mock'intas
                     # Claude API + tool use), email formatavimas (įsk. XSS
                     # apsaugos testai), run manifest statuso logika, circuit
                     # breaker būsenos pereigos, realus DOM parsinimas su
@@ -26,7 +26,7 @@ dublikatų šalinimą, santykinių/absoliučių URL apdorojimą. Tam reikalingas
 pytest --cov=. --cov-report=term-missing
 ```
 
-**Realiai išmatuotas rezultatas: 92.8%** (173 testai, žr. `pyproject.toml`
+**Realiai išmatuotas rezultatas: 92.9%** (187 testai, žr. `pyproject.toml`
 `[tool.coverage]` konfigūraciją). CI (`ci.yml`) vykdo testus su
 `--cov-fail-under=85` - jei coverage nukris žemiau 85%, CI sulūš.
 

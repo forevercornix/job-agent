@@ -67,6 +67,12 @@ def test_score_job_strips_markdown_json_fences(mock_client):
 
 @patch("ranker.client")
 def test_score_job_handles_malformed_json_gracefully(mock_client):
+    """
+    Nevalidus JSON dabar bando dar kartą (žr. GENERAL retry logiką) iki
+    max_iterations kartų - jei modelis NUOSEKLIAI grąžina nevalidų tekstą
+    (kaip šiame teste, kur mock visada grąžina tą patį), galiausiai vis
+    tiek grąžinamas saugus error rezultatas, tik po visų bandymų, ne po pirmo.
+    """
     mock_client.messages.create.return_value = _mock_text_response("nebe JSON tekstas be jokios prasmes")
 
     job = {"title": "X", "company": "Y", "snippet": "..."}
@@ -75,7 +81,7 @@ def test_score_job_handles_malformed_json_gracefully(mock_client):
     # Klaidos atveju turi grąžinti saugų default'ą, o ne mesti išimtį
     assert result["score"] == 0
     assert "reason" in result
-    assert stats["api_calls_made"] == 1
+    assert stats["api_calls_made"] == ranker.MAX_AGENT_ITERATIONS  # visos iteracijos išnaudotos bandant
 
 
 @patch("ranker.client")
@@ -578,6 +584,28 @@ def test_score_job_downgrades_high_score_with_fabricated_evidence(mock_client):
     assert result["score"] <= ranker.DOWNGRADE_SCORE_CAP
     assert result["score"] < 9  # NEGALI likti originalus aukštas balas
     # "reason" laukas gali likti (audito tikslais), bet balas jau nebekelia klaidingo įspūdžio
+
+
+@patch("ranker.client")
+def test_score_job_recovers_from_garbage_non_empty_text(mock_client):
+    """
+    KRITINIS testas TIKSLIAI gamybos radiniui (2026-07): json.loads() meta
+    LYGIAI TĄ PAČIĄ "Expecting value: line 1 column 1" klaidą tiek dėl
+    TUŠČIO teksto, tiek dėl BET KOKIO NETUŠČIO, bet iškart nevalidaus teksto
+    (pvz., vieno nutrūkusio simbolio "x"). Ankstesnis pataisymas tikrino tik
+    tuštumą (`if not text`) ir šio atvejo NEPAGAUDAVO - dabar bendra
+    retry-on-any-parse-failure logika turi tai pagauti taip pat.
+    """
+    mock_client.messages.create.side_effect = [
+        _mock_text_response("x"),  # netuščias, bet visiškai nevalidus JSON
+        _mock_text_response('{"score": 6, "reason": "Tinka.", "evidence": "SQL patirtis"}'),
+    ]
+
+    job = {"title": "IT PM", "company": "Test", "snippet": "SQL patirtis reikalinga."}
+    result, stats = ranker.score_job(job, candidate_profile="test")
+
+    assert result["score"] == 6  # antras bandymas pavyko
+    assert stats["api_calls_made"] == 2
 
 
 @patch("ranker.client")

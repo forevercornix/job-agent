@@ -456,15 +456,51 @@ gali iškviesti get_full_job_description įrankį - jis automatiškai gaus piln�
             continue  # kitas ciklo žingsnis - duodame Claude tool rezultatą
 
         # stop_reason != "tool_use" -> modelis baigė, tikimės galutinio JSON
+        text_blocks = [b.text for b in response.content if getattr(b, "type", None) == "text"]
+        text = "".join(text_blocks).strip()
+        text = text.replace("```json", "").replace("```", "").strip()
+
+        if not text:
+            # REALUS GAMYBOS RADINYS (2026-07): kartais po tool_use raundo
+            # Claude grąžina atsakymą BE jokio teksto bloko (tuščias content),
+            # nors stop_reason nėra "tool_use" - anksčiau tai iškart baigdavosi
+            # klaida ("Expecting value: line 1 column 1"), net jei dar buvo
+            # likusių iteracijų. Dabar VIETOJ pasidavimo, paprašome modelio
+            # pateikti atsakymą dar kartą tame pačiame agent loop cikle
+            # (naudojant likusią iteracijų kvotą, žr. MAX_AGENT_ITERATIONS).
+            logger.warning(
+                "Modelis negrąžino teksto atsakymo (tuščias content) - "
+                "prašoma pateikti JSON dar kartą",
+                extra={
+                    "job_title": job.get("title"),
+                    "iteration": iteration,
+                    "stop_reason": response.stop_reason,
+                },
+            )
+            if iteration < max_iterations:
+                messages.append({"role": "assistant", "content": response.content})
+                messages.append({
+                    "role": "user",
+                    "content": (
+                        "Negavau jokio teksto atsakymo. Prašau pateik GALUTINĮ "
+                        "JSON atsakymą DABAR, tiksliai pagal nurodytą formatą."
+                    ),
+                })
+                continue  # bandome dar kartą kitoje iteracijoje
+            # Paskutinė iteracija ir vis tiek tuščia - toliau į error keliu žemiau
+            text = ""  # užtikrina, kad json.loads mes tvarkingą klaidą, ne KeyError
+
         try:
-            text_blocks = [b.text for b in response.content if getattr(b, "type", None) == "text"]
-            text = "".join(text_blocks).strip()
-            text = text.replace("```json", "").replace("```", "").strip()
             parsed = json.loads(text)
         except Exception as e:
             logger.error(
                 "Modelio atsakymo nepavyko parsinti kaip JSON",
-                extra={"job_title": job.get("title"), "iteration": iteration, "error": str(e)},
+                extra={
+                    "job_title": job.get("title"),
+                    "iteration": iteration,
+                    "stop_reason": response.stop_reason,
+                    "error": str(e),
+                },
             )
             return (
                 _error_result(f"Vertinimo klaida: {e}"),

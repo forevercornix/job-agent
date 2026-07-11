@@ -184,7 +184,7 @@ def test_score_job_agent_loop_exceeds_max_iterations(mock_client):
 
 
 def test_execute_tool_unknown_tool_returns_error():
-    text, is_error = ranker._execute_tool("nezinomas_irankis", {})
+    text, is_error = ranker._execute_tool("nezinomas_irankis", {}, "https://x.test/expected")
     assert is_error is True
     assert "Nežinomas įrankis" in text
 
@@ -192,7 +192,7 @@ def test_execute_tool_unknown_tool_returns_error():
 @patch("scraper.fetch_page_text")
 def test_execute_tool_get_full_job_description_success(mock_fetch):
     mock_fetch.return_value = "Pilnas tekstas"
-    text, is_error = ranker._execute_tool("get_full_job_description", {"url": "https://x.test/1"})
+    text, is_error = ranker._execute_tool("get_full_job_description", {}, "https://x.test/expected")
     assert is_error is False
     assert text == "Pilnas tekstas"
 
@@ -200,9 +200,78 @@ def test_execute_tool_get_full_job_description_success(mock_fetch):
 @patch("scraper.fetch_page_text")
 def test_execute_tool_get_full_job_description_handles_exception(mock_fetch):
     mock_fetch.side_effect = RuntimeError("tinklo klaida")
-    text, is_error = ranker._execute_tool("get_full_job_description", {"url": "https://x.test/1"})
+    text, is_error = ranker._execute_tool("get_full_job_description", {}, "https://x.test/expected")
     assert is_error is True
     assert "tinklo klaida" in text
+
+
+# --- SSRF apsaugos testai ----------------------------------------------------
+
+@patch("scraper.fetch_page_text")
+def test_execute_tool_uses_expected_url_not_model_provided_url(mock_fetch):
+    """
+    KRITINIS SAUGUMO testas: net jei tool_input (modelio pateikti parametrai)
+    turėtų "url" raktą su VISAI KITU (potencialiai pavojingu) adresu,
+    _execute_tool TURI naudoti TIK expected_job_url, niekada tool_input.
+    """
+    mock_fetch.return_value = "turinys"
+
+    malicious_input = {"url": "http://169.254.169.254/latest/meta-data/"}
+    ranker._execute_tool("get_full_job_description", malicious_input, "https://real-job-site.test/job/1")
+
+    # fetch_page_text turėjo būti iškviestas su TIKRUOJU (expected) URL,
+    # NE su tuo, kurį "pasiūlė" tool_input
+    mock_fetch.assert_called_once_with("https://real-job-site.test/job/1")
+
+
+@patch("scraper.fetch_page_text")
+def test_execute_tool_ignores_arbitrary_tool_input_completely(mock_fetch):
+    """Net visiškai tuščias arba nesusijęs tool_input neturi įtakos - naudojamas TIK expected_job_url."""
+    mock_fetch.return_value = "turinys"
+
+    ranker._execute_tool("get_full_job_description", {"random_key": "random_value"}, "https://real.test/job/2")
+
+    mock_fetch.assert_called_once_with("https://real.test/job/2")
+
+
+def test_tools_schema_has_no_url_parameter():
+    """
+    Formalus kontrakto testas: TOOLS schema NETURI turėti "url" (ar bet kokio
+    kito) parametro get_full_job_description įrankiui - modelis fiziškai
+    negali pateikti URL, nes schema to neleidžia.
+    """
+    tool = next(t for t in ranker.TOOLS if t["name"] == "get_full_job_description")
+    assert tool["input_schema"]["properties"] == {}
+    assert tool["input_schema"].get("additionalProperties") is False
+
+
+@patch("ranker.client")
+def test_score_job_calls_tool_with_job_own_url_regardless_of_model_suggestion(mock_client):
+    """
+    End-to-end SSRF testas per score_job(): net jei modelis (per klaidą ar
+    prompt injection) grąžintų tool_use su "url" argumentu, realiai
+    iškviečiamas URL turi būti PATIES skelbimo url, ne modelio pasiūlytas.
+    """
+    with patch("scraper.fetch_page_text") as mock_fetch:
+        mock_fetch.return_value = "Pilnas tekstas su Agile ir SQL patirtimi"
+        mock_client.messages.create.side_effect = [
+            _mock_tool_use_response(
+                "get_full_job_description",
+                {"url": "http://internal-secret-service.local/admin"},  # modelio "pasiūlytas" URL
+            ),
+            _mock_text_response(
+                '{"score": 8, "reason": "Tinka.", "evidence": "Agile ir SQL patirtimi"}'
+            ),
+        ]
+
+        job = {
+            "title": "PM", "company": "Test",
+            "url": "https://real-job-site.test/job/legit-123",  # TIKRASIS skelbimo URL
+            "snippet": "Trumpas anonsas.",
+        }
+        ranker.score_job(job, candidate_profile="test")
+
+        mock_fetch.assert_called_once_with("https://real-job-site.test/job/legit-123")
 
 
 # --- rank_jobs agregavimo testai --------------------------------------------
@@ -464,6 +533,27 @@ def test_call_claude_uses_temperature_zero(mock_client):
 
 
 @patch("ranker.client")
+def test_call_claude_uses_sufficient_max_tokens_to_avoid_json_truncation(mock_client):
+    """
+    REGRESIJOS testas realiam radiniui: gamyboje pastebėta JSON parse klaidų
+    ("Expecting value", "Expecting ',' delimiter") - klasikiniai nutrūkusio
+    (truncated) JSON požymiai, kai max_tokens per mažas pilnam structured
+    output (score+reason+evidence+matched/missing_requirements). Ši riba
+    NETURI sumažėti žemiau 1024 be sąmoningo sprendimo ir pakartotinio
+    realaus patikrinimo.
+    """
+    mock_client.messages.create.return_value = _mock_text_response(
+        '{"score": 7, "reason": "...", "evidence": "..."}'
+    )
+
+    job = {"title": "X", "company": "Y", "snippet": "..."}
+    ranker.score_job(job, candidate_profile="test")
+
+    _, kwargs = mock_client.messages.create.call_args
+    assert kwargs["max_tokens"] >= 1024
+
+
+@patch("ranker.client")
 def test_score_job_downgrades_high_score_with_fabricated_evidence(mock_client):
     """
     TIKSLIAI vartotojo klausimo scenarijus: modelis grąžina AUKŠTĄ balą su
@@ -496,3 +586,65 @@ def test_preflight_check_does_not_require_temperature(mock_client):
     mock_client.messages.create.return_value = _mock_text_response("pong")
     ok, err = ranker.preflight_check()
     assert ok is True
+
+
+# --- Tuščio atsakymo atkūrimo testai (realus gamybos radinys, 2026-07) -----
+
+def _mock_empty_response(stop_reason: str = "end_turn"):
+    """Simuliuoja realų gamyboje pastebėtą atvejį: atsakymas be jokio teksto bloko."""
+    mock_response = MagicMock()
+    mock_response.content = []  # jokių blokų - nei text, nei tool_use
+    mock_response.stop_reason = stop_reason
+    return mock_response
+
+
+@patch("ranker.client")
+def test_score_job_recovers_from_empty_response_by_retrying(mock_client):
+    """
+    KRITINIS testas realiam gamybos radiniui: jei Claude grąžina tuščią
+    atsakymą (be teksto), score_job TURI paprašyti dar kartą (naudodamas
+    likusią iteracijų kvotą), o ne iškart pasiduoti su klaida.
+    """
+    mock_client.messages.create.side_effect = [
+        _mock_empty_response(),
+        _mock_text_response('{"score": 7, "reason": "Tinka.", "evidence": "Reikalinga IT patirtis"}'),
+    ]
+
+    job = {"title": "IT PM", "company": "Test", "snippet": "Reikalinga IT patirtis."}
+    result, stats = ranker.score_job(job, candidate_profile="test")
+
+    assert result["score"] == 7  # antras bandymas pavyko
+    assert stats["api_calls_made"] == 2  # abu kvietimai įskaičiuoti
+
+
+@patch("ranker.client")
+def test_score_job_fails_gracefully_if_empty_response_persists(mock_client):
+    """
+    Jei tuščias atsakymas kartojasi VISAS iteracijas (max_iterations), score_job
+    turi grąžinti saugų error rezultatą (score=0), o ne kabinti procesą ar
+    mesti nesugautą išimtį.
+    """
+    mock_client.messages.create.return_value = _mock_empty_response()
+
+    job = {"title": "IT PM", "company": "Test", "snippet": "..."}
+    result, stats = ranker.score_job(job, candidate_profile="test", max_iterations=3)
+
+    assert result["score"] == 0
+    assert result["reason"].startswith("Vertinimo klaida:")
+    assert stats["api_calls_made"] == 3  # visos 3 iteracijos išnaudotos
+
+
+@patch("ranker.client")
+def test_score_job_logs_stop_reason_when_response_empty(mock_client):
+    """Diagnostikai svarbu matyti stop_reason, kai atsakymas tuščias - padeda atskirti priežastis ateityje."""
+    with patch("ranker.logger") as mock_logger:
+        mock_client.messages.create.side_effect = [
+            _mock_empty_response(stop_reason="max_tokens"),
+            _mock_text_response('{"score": 5, "reason": "...", "evidence": "..."}'),
+        ]
+
+        job = {"title": "X", "company": "Y", "snippet": "..."}
+        ranker.score_job(job, candidate_profile="test")
+
+        warning_call = mock_logger.warning.call_args
+        assert warning_call.kwargs["extra"]["stop_reason"] == "max_tokens"

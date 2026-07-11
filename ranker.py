@@ -460,21 +460,26 @@ gali iškviesti get_full_job_description įrankį - jis automatiškai gaus piln�
         text = "".join(text_blocks).strip()
         text = text.replace("```json", "").replace("```", "").strip()
 
-        if not text:
-            # REALUS GAMYBOS RADINYS (2026-07): kartais po tool_use raundo
-            # Claude grąžina atsakymą BE jokio teksto bloko (tuščias content),
-            # nors stop_reason nėra "tool_use" - anksčiau tai iškart baigdavosi
-            # klaida ("Expecting value: line 1 column 1"), net jei dar buvo
-            # likusių iteracijų. Dabar VIETOJ pasidavimo, paprašome modelio
-            # pateikti atsakymą dar kartą tame pačiame agent loop cikle
-            # (naudojant likusią iteracijų kvotą, žr. MAX_AGENT_ITERATIONS).
+        try:
+            parsed = json.loads(text)
+        except Exception as e:
+            # REALUS GAMYBOS RADINYS (2026-07): Claude retkarčiais grąžina
+            # nevalidų JSON (tuščią, nutrūkusį ar tiesiog "nesusijusį" tekstą),
+            # ne tik po tool_use raundo, bet ir pirmoje iteracijoje. Bandymas
+            # tikrinti TIK tuštumą (`if not text`) NEPAKANKAMAS - json.loads()
+            # meta TĄ PAČIĄ "Expecting value" klaidą tiek dėl tuščio teksto,
+            # tiek dėl bet kokio kito iškart nevalidaus teksto (pvz., vieno
+            # nutrūkusio simbolio). Todėl VIETOJ siauro tuštumo tikrinimo,
+            # BET KOKS parse failure dabar bando dar kartą (naudojant likusią
+            # iteracijų kvotą), o ne iškart pasiduoda.
             logger.warning(
-                "Modelis negrąžino teksto atsakymo (tuščias content) - "
-                "prašoma pateikti JSON dar kartą",
+                "Modelio atsakymo nepavyko parsinti kaip JSON - bandoma dar kartą",
                 extra={
                     "job_title": job.get("title"),
                     "iteration": iteration,
                     "stop_reason": response.stop_reason,
+                    "error": str(e),
+                    "response_preview": text[:100],
                 },
             )
             if iteration < max_iterations:
@@ -482,19 +487,17 @@ gali iškviesti get_full_job_description įrankį - jis automatiškai gaus piln�
                 messages.append({
                     "role": "user",
                     "content": (
-                        "Negavau jokio teksto atsakymo. Prašau pateik GALUTINĮ "
-                        "JSON atsakymą DABAR, tiksliai pagal nurodytą formatą."
+                        f"Tavo atsakymas nebuvo validus JSON (klaida: {e}). "
+                        "Prašau pateik GALUTINĮ JSON atsakymą DABAR, tiksliai "
+                        "pagal nurodytą formatą, be jokio papildomo teksto ar "
+                        "markdown žymėjimo."
                     ),
                 })
                 continue  # bandome dar kartą kitoje iteracijoje
-            # Paskutinė iteracija ir vis tiek tuščia - toliau į error keliu žemiau
-            text = ""  # užtikrina, kad json.loads mes tvarkingą klaidą, ne KeyError
 
-        try:
-            parsed = json.loads(text)
-        except Exception as e:
+            # Iteracijų kvota išnaudota ir vis tiek nevalidu - galutinė klaida
             logger.error(
-                "Modelio atsakymo nepavyko parsinti kaip JSON",
+                "Modelio atsakymo nepavyko parsinti kaip JSON po visų bandymų",
                 extra={
                     "job_title": job.get("title"),
                     "iteration": iteration,

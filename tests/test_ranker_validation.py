@@ -1,79 +1,63 @@
-"""
-Dedikuoti testai naujoms LLM reliability funkcijoms ranker.py:
-- _validate_schema (JSON schema validacija)
-- _is_evidence_grounded (evidence substring/fuzzy patikra)
-- _coerce_string_list (matched_requirements/missing_requirements apdorojimas)
+"""Pure RankResponse, grounding and requirement-list validation tests."""
 
-Šie testai atskirti nuo test_ranker.py, nes tikrina PAČIAS validacijos
-funkcijas izoliuotai (be Claude API mock'inimo), kad būtų aišku, kas tiksliai
-testuojama - schema kontraktas ir grounding logika, ne visas agent loop.
-"""
+import pytest
+from pydantic import ValidationError
 
 import ranker
 
-# --- JSON Schema validacijos testai -----------------------------------------
+# --- ThinHarness structured output model ------------------------------------
 
-def test_validate_schema_accepts_complete_valid_response():
-    result = {"score": 8, "reason": "Gerai tinka", "evidence": "citata"}
-    is_valid, error = ranker._validate_schema(result)
-    assert is_valid is True
-    assert error is None
+@pytest.mark.parametrize("field", ["score", "reason", "evidence"])
+def test_rank_response_rejects_missing_required_field(field):
+    payload = {"score": 8, "reason": "Gerai tinka", "evidence": "citata"}
+    payload.pop(field)
 
+    with pytest.raises(ValidationError) as error:
+        ranker.RankResponse.model_validate(payload)
 
-def test_validate_schema_rejects_missing_score():
-    result = {"reason": "Gerai tinka", "evidence": "citata"}
-    is_valid, error = ranker._validate_schema(result)
-    assert is_valid is False
-    assert "score" in error
+    assert field in str(error.value)
 
 
-def test_validate_schema_rejects_missing_reason():
-    result = {"score": 8, "evidence": "citata"}
-    is_valid, error = ranker._validate_schema(result)
-    assert is_valid is False
-    assert "reason" in error
+def test_rank_response_rejects_blank_reason():
+    with pytest.raises(ValidationError, match="reason must not be blank"):
+        ranker.RankResponse(score=8, reason="   ", evidence="citata")
 
 
-def test_validate_schema_rejects_missing_evidence():
-    result = {"score": 8, "reason": "Gerai tinka"}
-    is_valid, error = ranker._validate_schema(result)
-    assert is_valid is False
-    assert "evidence" in error
+def test_rank_response_rejects_non_string_evidence():
+    with pytest.raises(ValidationError) as error:
+        ranker.RankResponse(score=8, reason="Gerai tinka", evidence=12345)
+
+    assert "evidence" in str(error.value)
 
 
-def test_validate_schema_rejects_empty_reason():
-    result = {"score": 8, "reason": "   ", "evidence": "citata"}
-    is_valid, error = ranker._validate_schema(result)
-    assert is_valid is False
+def test_rank_response_rejects_non_numeric_score():
+    with pytest.raises(ValidationError) as error:
+        ranker.RankResponse(score="labai geras", reason="Gerai tinka", evidence="citata")
+
+    assert "score" in str(error.value)
 
 
-def test_validate_schema_rejects_non_string_evidence():
-    result = {"score": 8, "reason": "Gerai tinka", "evidence": 12345}
-    is_valid, error = ranker._validate_schema(result)
-    assert is_valid is False
-    assert "evidence" in error
+def test_rank_response_accepts_empty_evidence_and_defaults_optional_lists():
+    response = ranker.RankResponse(score=5, reason="Tinka", evidence="")
+
+    assert response.evidence == ""
+    assert response.matched_requirements == []
+    assert response.missing_requirements == []
 
 
-def test_validate_schema_rejects_non_numeric_score():
-    result = {"score": "labai geras", "reason": "Gerai tinka", "evidence": "citata"}
-    is_valid, error = ranker._validate_schema(result)
-    assert is_valid is False
-    assert "score" in error
+def test_rank_response_keeps_requirement_inputs_permissive_for_legacy_coercion():
+    response = ranker.RankResponse(
+        score="8",
+        reason="Tinka",
+        evidence="citata",
+        matched_requirements=["SQL", 5],
+        missing_requirements="ne sąrašas",
+        extra_field="ignoruojamas",
+    )
 
-
-def test_validate_schema_accepts_empty_evidence_string():
-    """Tuščia evidence eilutė - VALIDI schemos prasme (raktas yra, tipas teisingas),
-    net jei vėliau bus laikoma "negrounded" - tai skirtingi patikrinimo sluoksniai."""
-    result = {"score": 5, "reason": "...", "evidence": ""}
-    is_valid, error = ranker._validate_schema(result)
-    assert is_valid is True
-
-
-def test_validate_schema_accepts_extra_unexpected_fields():
-    """Papildomi laukai (matched_requirements ir pan.) neturi sugriauti validacijos."""
-    result = {"score": 8, "reason": "...", "evidence": "citata", "extra_field": "kažkas"}
-    is_valid, error = ranker._validate_schema(result)
-    assert is_valid is True
+    assert response.score == 8
+    assert response.matched_requirements == ["SQL", 5]
+    assert response.missing_requirements == "ne sąrašas"
 
 
 # --- Evidence grounding (substring/fuzzy) testai ----------------------------

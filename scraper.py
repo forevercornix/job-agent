@@ -206,9 +206,8 @@ def fetch_page_text(url: str, max_chars: int = 3000) -> str:
     Grąžina apkarpytą tekstą (max_chars) - apsauga nuo per didelio token
     sunaudojimo, jei puslapis netikėtai didelis.
 
-    Kelia išimtį klaidos atveju (kviečiantysis kodas - ranker.py - turi ją
-    sugauti ir paversti į tool_result su is_error=True, o ne leisti kristi
-    visam agent loop).
+    Kelia išimtį klaidos atveju. ThinHarness ją paverčia modelio matomu
+    nepavykusiu ToolResult ir tęsia agento ciklą.
     """
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)

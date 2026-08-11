@@ -6,12 +6,14 @@ Testai schemas/rank_result.schema.json kontraktui - patikrina, kad:
 3. Sąmoningai sugadintas rezultatas TEISINGAI atmetamas kaip nevalidus
 """
 
-from unittest.mock import patch
+import json
 
 import jsonschema
 import pytest
+from thinharness import HarnessError, ModelTurn
 
 import ranker
+from tests.scripted_model import ScriptedModel
 
 
 def test_schema_file_is_valid_json_schema():
@@ -91,85 +93,49 @@ def test_validate_against_contract_helper_rejects_invalid_result():
     assert error is not None
 
 
-# --- End-to-end: realus score_job() rezultatas per mock'intą Claude API ----
-
-def _mock_text_response(text: str):
-    from unittest.mock import MagicMock
-    mock_block = MagicMock()
-    mock_block.type = "text"
-    mock_block.text = text
-    mock_response = MagicMock()
-    mock_response.content = [mock_block]
-    mock_response.stop_reason = "end_turn"
-    return mock_response
+# --- End-to-end through real ThinHarness + scripted Model ------------------
 
 
-@patch("ranker.client")
-def test_score_job_real_output_conforms_to_contract(mock_client):
-    """
-    KRITINIS testas: realus (mock'intu API) score_job() rezultatas TURI
-    atitikti formalų kontraktą - tai patvirtina, kad dokumentacija
-    (schemas/rank_result.schema.json) ir kodo elgesys nesiskiria.
-    """
-    mock_client.messages.create.return_value = _mock_text_response(
-        '{"score": 8, "reason": "Gerai atitinka.", '
-        '"evidence": "Reikalaujama SQL patirties", '
-        '"matched_requirements": ["SQL"], "missing_requirements": []}'
-    )
+def _turn(score, evidence):
+    return ModelTurn(text=json.dumps({
+        "score": score,
+        "reason": "Atitinka.",
+        "evidence": evidence,
+        "matched_requirements": ["SQL"],
+        "missing_requirements": [],
+    }))
 
+
+def test_score_job_real_output_conforms_to_contract():
+    model = ScriptedModel([_turn(8, "Reikalaujama SQL patirties")])
     job = {"title": "PM", "company": "Test", "snippet": "Reikalaujama SQL patirties."}
-    result, _ = ranker.score_job(job, candidate_profile="test profile")
 
-    jsonschema.validate(instance=result, schema=ranker.RANK_RESULT_SCHEMA)  # nemeta išimties
-
-
-@patch("ranker.client")
-def test_score_job_error_path_output_conforms_to_contract(mock_client):
-    """Klaidos kelio (API exception) rezultatas TAIP PAT turi atitikti kontraktą."""
-    mock_client.messages.create.side_effect = ConnectionError("API nepasiekiamas")
-
-    job = {"title": "X", "company": "Y", "snippet": "..."}
-    result, _ = ranker.score_job(job, candidate_profile="test profile")
+    result, _ = ranker.score_job(job, candidate_profile="test profile", model=model)
 
     jsonschema.validate(instance=result, schema=ranker.RANK_RESULT_SCHEMA)
 
 
-# --- Konsoliduotas "evidence kontrakto" testas (3 sąlygos viename teste) ---
+def test_score_job_error_path_output_conforms_to_contract():
+    model = ScriptedModel([HarnessError("provider error 401: invalid key")])
+    job = {"title": "X", "company": "Y", "snippet": "..."}
 
-@patch("ranker.client")
-def test_evidence_contract_full_specification(mock_client):
-    """
-    KONSOLIDUOTAS testas trims evidence kontrakto sąlygoms:
-    1. Modelio atsakymas TURI evidence lauką
-    2. Evidence PATIKRINAMAS, ar randamas job_text (skelbimo tekste)
-    3. Jei NErandamas - balas sumažinamas (downgrade), rezultatas NEATMETAMAS
-       visiškai (nes tai galėtų būti tiesiog formato/interpretacijos
-       nesutapimas, ne būtinai visiška nesąmonė) - bet jis nebegali klaidinti
-       aukštu balu.
+    result, _ = ranker.score_job(job, candidate_profile="test profile", model=model)
 
-    Du atskiri pod-testai tame pačiame teste: (a) grounded atvejis palieka
-    balą, (b) ungrounded atvejis jį sumažina.
-    """
-    job_text_snippet = "Reikalaujama 5 metų Python programavimo patirties."
-    job = {"title": "Developer", "company": "TestCo", "snippet": job_text_snippet}
+    jsonschema.validate(instance=result, schema=ranker.RANK_RESULT_SCHEMA)
 
-    # (a) Evidence YRA ir RANDAMAS job_text - balas išlieka
-    mock_client.messages.create.return_value = _mock_text_response(
-        '{"score": 8, "reason": "Atitinka.", '
-        '"evidence": "5 metų Python programavimo patirties"}'
+
+def test_evidence_contract_preserves_grounded_score_and_downgrades_fabrication():
+    job_text = "Reikalaujama 5 metų Python programavimo patirties."
+    job = {"title": "Developer", "company": "TestCo", "snippet": job_text}
+    model = ScriptedModel(
+        [_turn(8, "5 metų Python programavimo patirties")],
+        [_turn(8, "10 metų kvantinės kriptografijos patirties")],
     )
-    result_grounded, _ = ranker.score_job(job, candidate_profile="test")
-    assert "evidence" in result_grounded  # (1) laukas yra
-    assert result_grounded["grounded"] is True  # (2) rastas job_text
-    assert result_grounded["score"] == 8  # NEsumažintas, nes pagrįstas
 
-    # (b) Evidence YRA, bet NErandamas job_text (fabrikuotas) - balas sumažinamas
-    mock_client.messages.create.return_value = _mock_text_response(
-        '{"score": 8, "reason": "Atitinka.", '
-        '"evidence": "10 metų kvantinės kriptografijos patirties"}'
-    )
-    result_ungrounded, _ = ranker.score_job(job, candidate_profile="test")
-    assert "evidence" in result_ungrounded  # (1) laukas yra
-    assert result_ungrounded["grounded"] is False  # (2) NErastas job_text
-    assert result_ungrounded["score"] <= ranker.DOWNGRADE_SCORE_CAP  # (3) sumažintas
-    assert result_ungrounded["score"] < result_grounded["score"]  # akivaizdus skirtumas
+    grounded, _ = ranker.score_job(job, candidate_profile="test", model=model)
+    ungrounded, _ = ranker.score_job(job, candidate_profile="test", model=model)
+
+    assert grounded["grounded"] is True
+    assert grounded["score"] == 8
+    assert ungrounded["grounded"] is False
+    assert ungrounded["score"] == ranker.DOWNGRADE_SCORE_CAP

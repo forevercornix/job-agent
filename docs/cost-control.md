@@ -22,11 +22,16 @@ Jei per vieną paleidimą surandama daugiau naujų skelbimų nei šis limitas
 pervertinti KITAME paleidime, o ne prarasti ar visi iškart nusiųsti Claude
 per vieną paleidimą (žr. `tests/test_main_unit.py::test_main_caps_jobs_sent_to_ranker_per_max_jobs_per_run`).
 
-**4. API kvietimai loginami manifeste**
+**4. Modelio ir tool kvietimai loginami manifeste**
 Kiekvienas paleidimas fiksuoja `api_calls_made` ir `tool_calls_made`
-`run_manifest.json` faile (žr. skyrių "Run Manifest" `docs/architecture.md`) -
-matote TIKSLIAI, kiek kartų buvo kreiptasi į Claude API, be poreikio
-skaičiuoti iš Anthropic Console atskirai.
+`run_manifest.json` faile (žr. `docs/architecture.md`). Sėkminguose ThinHarness
+run'uose tai yra `HarnessResult.usage` skaitikliai. Nepavykusio provider
+request'o ThinHarness usage negrąžina, todėl `ranker.py` jį aproksimuoja kaip
+vieną papildomą API request; prieš klaidą sėkmingai užbaigti request'ai ir tool
+call'ai paimami iš viešo `run_end` hook usage. Provider transporto retry
+atskirai neskaičiuojami. Todėl šie skaičiai rodo loginį modelio darbą,
+bet ne tikslų HTTP bandymų skaičių. Tiksliam apmokestinimui
+naudokite Anthropic Console.
 
 **Ko tai NEIŠSPRENDŽIA**: nėra griežto piniginio biudžeto (pvz., "ne daugiau
 kaip 1 USD per paleidimą") - visi keturi mechanizmai riboja KIEKĮ (skelbimų/

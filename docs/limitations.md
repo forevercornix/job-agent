@@ -13,8 +13,8 @@ Trumpa versija (4 svarbiausi punktai) yra pagrindiniame README. Čia — pilnas 
 - Generinis selektorius (`job_link_substring`) veikia daugumai svetainių
   struktūrų, bet retkarčiais reikės pakoreguoti `sources.local.yaml` arba
   `_extract_jobs_from_page()`, kai svetainė keičia dizainą
-- Retry logika taikoma tik laikinoms klaidoms (tinklas, rate limit, 5xx) —
-  autentifikacijos ar blogos užklausos klaidos nekartojamos (nepavyktų ir kitą kartą)
+- Retry logika taikoma tik laikinoms klaidoms (tinklas, HTTP 408, 409, 425,
+  429 ir 5xx). Autentifikacijos ir kitos non-retryable 4xx nekartojamos
 - **LLM vertinimas nėra 100% deterministinis** — `temperature=0` sumažina
   atsitiktinį svyravimą, bet NEPAŠALINA jo visiškai ir NEPAGERINA sprendimo
   kokybės, tik nuoseklumą

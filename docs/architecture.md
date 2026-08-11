@@ -11,7 +11,7 @@
            ▼
 ┌─────────────────────┐
 │  Preflight Check      │   ranker.preflight_check()
-│                       │   pigus (max_tokens=1) Claude API kvietimas -
+│                       │   vieno request'o, no-tools ThinHarness kvietimas -
 │                       │   fail fast PRIEŠ brangų scraping, jei raktas/tinklas neveikia
 └──────────┬───────────┘
            │ OK
@@ -36,14 +36,13 @@
            │  list[dict] (tik nauji)
            ▼
 ┌─────────────────────┐
-│   Claude Ranker       │   ranker.py + prompts/ranking_prompt.md
-│   (TOOL-CALLING       │   AGENT LOOP kiekvienam skelbimui:
-│    AGENT LOOP)        │     1. Claude gauna snippet + įrankį get_full_job_description
-│                       │     2. Jei reikia daugiau konteksto → PATS nusprendžia
-│                       │        iškviesti įrankį (realiai atidaro puslapį per
-│                       │        scraper.fetch_page_text())
-│                       │     3. Kai turi info: grąžina {"score":1-10, "reason":...}
-│                       │     Apsauga: max 3 iteracijos (MAX_AGENT_ITERATIONS)
+│ ThinHarness Ranker    │   ranker.py + prompts/ranking_prompt.md
+│ (Claude + TOOL)       │   fresh Harness kiekvienam skelbimui:
+│                       │     1. Claude gauna snippet + įrankį get_full_job_description
+│                       │     2. ThinHarness vykdo modelio pasirinktą įrankį per
+│                       │        scraper.fetch_page_text() ir tęsia sesiją
+│                       │     3. Anthropic native schema → RankResponse
+│                       │     Apsauga: 5 model requests, 3 tool calls, 2 output retries
 └──────────┬───────────┘
            │  list[dict] (score >= MIN_MATCH_SCORE) + {api_calls_made, tool_calls_made}
            ▼
@@ -206,7 +205,7 @@ circuit breaker būsenos faile).
 | `scraper.py` | Naršymas ir duomenų ištraukimas (generinė funkcija visiems `sources.yaml` šaltiniams), automatinis retry laikinoms klaidoms, per-source statistika, circuit breaker integracija | `playwright`, `pyyaml`, `tenacity`, `circuit_breaker` |
 | `circuit_breaker.py` | Šaltinių "sveikatos" sekimas tarp paleidimų - OPEN/CLOSED būsena, `circuit_breaker_state.json` | — |
 | `deduplicator.py` | Dublikatų šalinimas, matytų skelbimų failo valdymas | — |
-| `ranker.py` | TOOL-CALLING AGENT: vertinimas per Claude API su `get_full_job_description` įrankiu, JSON schema + grounding validacija (žr. docs/llm-reliability.md), automatinis retry, preflight healthcheck, prompt injection apsauga | `anthropic`, `tenacity`, `jsonschema`, `scraper` (tool vykdymui) |
+| `ranker.py` | ThinHarness 0.6.0 TOOL-CALLING AGENT: Claude, `get_full_job_description`, Pydantic structured output + formalus kontraktas + grounding, provider request retry, preflight, prompt injection apsauga | `thinharness`, `pydantic`, `jsonschema`, `scraper` (tool vykdymui) |
 | `manifest.py` | Vykdymo pėdsakas (execution trace) - statuso nustatymas, `run_manifest.json` | — |
 | `logging_config.py` | Struktūrizuotas (JSON/console) logging visiems moduliams | — |
 | `format_email.py` | JSON → skaitomas tekstas | — |
@@ -247,26 +246,24 @@ trumpo anonso nepakanka:
   pilną puslapį" (brangu - kiekvienam skelbimui papildomas Playwright
   atidarymas) arba "niekada nenuskaityti" (netikslu - kai kurie anonsai per
   trumpi), agentas sprendžia individualiai kiekvienam skelbimui
-- **Apsauga nuo begalinio ciklo**: `MAX_AGENT_ITERATIONS=3` - jei modelis vis
-  kviečia įrankį ir nepasiekia galutinio atsakymo, laikoma klaida, ne
-  užkabinimas
+- **Apsauga nuo begalinio ciklo**: ThinHarness ribos yra 5 model requests ir
+  3 tool calls; struktūrizuota išvestis papildomai turi 2 corrective retry.
+  Viršijus bet kurią ribą grąžinamas saugus klaidos rezultatas
 - **Klaidų izoliacija tarp žingsnių**: jei `get_full_job_description`
-  nepavyksta (svetainė neatsidaro), tool_result pažymimas `is_error=True`, ir
-  modelis GALI tęsti su tuo, ką jau turi (žr. testą
-  `test_score_job_handles_tool_execution_failure_gracefully`), o ne visas
-  vertinimas žlunga
+  nepavyksta, ThinHarness pateikia modeliui failed `ToolResult` be automatinio
+  tool retry; modelis gali tęsti su turimu snippet, o ne visas vertinimas žlunga
 
 ## Klaidų valdymas (žr. taip pat docs/limitations.md)
 
 | Scenarijus | Dabartinis elgesys |
 |---|---|
 | Svetainė neatsidaro / timeout (laikina tinklo klaida) | `scraper.py` automatiškai bando dar 2 kartus su eksponentiniu backoff (2s, 4s) per `tenacity`. Jei ir po 3 bandymų nepavyksta, klaida užloginama, tas šaltinis praleidžiamas, tęsiama su kitais |
-| Claude API laikina klaida (rate limit, overload, tinklas, 5xx) | `ranker.py` automatiškai bando dar 2 kartus su eksponentiniu backoff (2s, 4s, iki 20s) per `tenacity`. Autentifikacijos/blogos užklausos klaidos (4xx, išskyrus rate limit) NEBANDOMOS kartoti, nes jos nepavyks ir kitą kartą |
-| Claude API galutinai neatsako (po retry) arba grąžina netinkamą JSON | `ranker.py` sugauna išimtį, skelbimui priskiria `score=0` (nepatenka į atranką), tęsia su kitais skelbimais |
+| Claude provider laikina klaida (connection/timeout, 408, 409, 425, 429, 5xx) | ThinHarness iki 2 kartų pakartoja tą patį provider request tame pačiame pokalbyje. Autentifikacijos ir kitos non-retryable 4xx nekartojamos. Jau užbaigtas puslapio tool kvietimas nekartojamas |
+| Provider galutinai neatsako arba structured output lieka netinkama po 2 pataisymų | `ranker.py` sugauna išimtį, skelbimui priskiria `score=0` ir tęsia su kitais skelbimais |
 | El. laiško siuntimas nepavyksta | Workflow žingsnis pažymimas kaip failed, bet ankstesni žingsniai (rezultatų generavimas) jau įvykę — kitą kartą paleidus, `seen_jobs.json` jau atnaujintas, tad tie patys skelbimai nebus pervertinti (žinomas apribojimas — jei norite, kad email klaida nesutrukdytų `seen_jobs.json` atnaujinimo tvarkos, siųskite laišką prieš `seen_jobs.json` atnaujinimą) |
 | Autentifikacijos/blogas API raktas | `ranker.preflight_check()` aptinka PRIEŠ scraping, `main.py` sustoja su `status=preflight_failed` ir exit code 1 - nešvaisto laiko scraping'ui, kuris vis tiek baigtųsi nesėkme |
-| `get_full_job_description` įrankis nepavyksta (svetainė neatsidaro) | `ranker._execute_tool()` sugauna išimtį, grąžina `tool_result` su `is_error=True` - agent loop TĘSIASI, modelis gali baigti vertinimą su turima informacija, o ne visas `score_job()` žlunga |
-| Agent loop viršija `MAX_AGENT_ITERATIONS` (modelis vis kviečia įrankį, nepasiekia galutinio atsakymo) | `ranker.py` sustabdo ciklą po 3 iteracijų, skelbimui priskiria `score=0`, tęsia su kitais skelbimais |
+| `get_full_job_description` įrankis nepavyksta | Handler išimtį ThinHarness paverčia modelio matomu failed `ToolResult`; `tool_retries=0`, todėl modelis tęsia su turima informacija |
+| Agentas viršija capacity | ThinHarness sustabdo po 5 model requests arba prieš 4-ą tool call; skelbimui priskiriamas `score=0`, kiti skelbimai tęsiami |
 | Šaltinis nuosekliai fail'ina kelis PALEIDIMUS iš eilės (pvz., selektorius sugedo) | Po 3 nuoseklių paleidimų nesėkmių `circuit_breaker.py` "atidaro" šaltinį - kitą 24h jis praleidžiamas be jokio bandymo, apsaugant nuo beprasmio pakartotinio bandymo |
 | 0 rezultatų iš scraperio | `manifest.py` atskiria priežastį: jei šaltiniai sukonfigūruoti ir bent vienas sėkmingai suveikė, bet nieko naujo neatsirado → `status=ok_no_new_jobs` (normalu, exit 0). Jei šaltinių sąrašas tuščias → `status=no_sources_configured` (exit 1). Jei visi šaltiniai sukonfigūruoti, bet visi bandymai nepavyko → `status=all_sources_failed` (exit 1). Jei visi šaltiniai praleisti dėl circuit breaker → `status=all_sources_circuit_open` (exit 0 - breaker veikia taip, kaip suprojektuota) |
 
@@ -298,8 +295,8 @@ trumpo anonso nepakanka:
 - Nėra SLI/SLO formalizavimo (pvz., "95% paleidimų per mėnesį turi baigtis
   be kritinės klaidos") - `run_manifest.json` perrašomas kas paleidimą,
   istorija nekaupiama, tad tokio metriko skaičiuoti nėra iš ko
-- `scraper.py` test coverage (73.7%) žemesnis nei kitų modulių (96-100%) -
-  realaus tinklo/naršyklės navigacijos kodo negalima patikimai testuoti be
+- `scraper.py` test coverage žemesnis nei kitų modulių - realaus
+  tinklo/naršyklės navigacijos kodo negalima patikimai testuoti be
   arba realaus interneto ryšio (nepageidautina CI), arba gilaus Playwright
   API mock'inimo (mažai realios vertės). DOM parsinimo logika (didžiausia
   rizika) YRA pilnai padengta - žr. docs/testing.md "Test coverage" skyrių

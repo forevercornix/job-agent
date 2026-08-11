@@ -87,9 +87,11 @@ pilną paaiškinimą):
 - `scraper.fetch_page_text()` apkarpo tool rezultatą iki 3000 simbolių -
   riboja, kiek "vietos" turi galimas injection bandymas
 - Balas priverstinai apkarpomas į 0-10 ribas kode, nepriklausomai nuo modelio atsakymo
-- `MAX_AGENT_ITERATIONS=3` riboja, kiek kartų agentas gali kviesti įrankius
-  vienam skelbimui - net jei injection bandymas pavyktų įtikinti modelį
-  kviesti įrankį pakartotinai, žala apribota
+- ThinHarness konfigūracija išjungia visus builtin įrankius ir local plaintext tracing
+- `get_full_job_description` naudoja tuščią argumentų modelį ir closure virš programinio
+  job URL; modelio pateikti extra laukai (įskaitant `url`) ignoruojami
+- `max_model_requests=5` ir `max_tool_calls=3` riboja pakartotinius veiksmus
+  vienam skelbimui, net jei injection bandymas įtikintų modelį kartoti įrankį
 
 Tai **defense-in-depth, ne absoliuti garantija**. Kritiniam naudojimui
 (pvz., automatiniam CV siuntimui be žmogaus peržiūros) reikėtų papildomos

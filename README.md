@@ -1,14 +1,12 @@
-# Darbo paieškos agentas (Playwright + Claude API)
+# Darbo paieškos agentas (Playwright + ThinHarness + Claude)
 
 ![CI](https://github.com/forevercornix/job-agent/actions/workflows/ci.yml/badge.svg)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
-![Coverage](https://img.shields.io/badge/coverage-93%25-brightgreen.svg)
 
 | Metric | Value |
 |---|---|
 | Python | ~1 840 LOC (be testų) |
-| Tests | 173 |
-| Coverage | 92.9% |
+| Quality | Pytest, coverage gate, Ruff |
 | Sources | Configurable (`sources.yaml`) |
 | LLM | Claude, Tool Use |
 | Parallel scraping | 3 sources |
@@ -23,7 +21,7 @@
 
 **LLM-assisted job search automation** (AI-powered job matching workflow) —
 naršo darbo skelbimų svetaines (Playwright), įvertina kiekvieno skelbimo
-atitikimą kandidato profiliui per Claude API su struktūrizuota, validuojama
+atitikimą kandidato profiliui per ThinHarness ir Claude su struktūrizuota, validuojama
 išvestimi, ir atsiunčia santrauką el. paštu — pilnai automatizuotas per
 GitHub Actions.
 
@@ -64,7 +62,7 @@ flowchart LR
 Devynios pagrindinės dalys: **Preflight** (fail fast, jei API nepasiekiamas)
 → **Scraper** (lygiagretus, su circuit breaker apsauga nuo nuolat lūžtančių
 šaltinių) → **Deduplicator** (jau matyti skelbimai niekada nesiunčiami Claude
-pakartotinai) → **LLM Ranker** (tool-calling agentas su schema/grounding
+pakartotinai) → **LLM Ranker** (ThinHarness 0.6.0 tool-calling agentas su schema/grounding
 validacija, žr. `docs/llm-reliability.md`) → **Run Manifest + Structured
 Logs** (aiškus statusas ir exit code kiekvienam paleidimui) → **Email**.
 
@@ -76,8 +74,8 @@ lentele ir klaidų valdymo aprašymu — **`docs/architecture.md`**.
 - 🤖 **LLM-assisted vertinimas su tool use** (ne single-shot klasifikacija) - Claude pats
   sprendžia, ar trumpo skelbimo anonso pakanka vertinimui, ar reikia iškviesti
   `get_full_job_description` įrankį pilnam puslapio tekstui gauti
-- 🎯 **LLM Reliability** — JSON schema validacija (kodinė + formalus
-  `schemas/rank_result.schema.json` kontraktas), `evidence` citata
+- 🎯 **LLM Reliability** — ThinHarness/Pydantic structured-output validacija su
+  dviem pataisymo bandymais + formalus `schemas/rank_result.schema.json` kontraktas, `evidence` citata
   PROGRAMIŠKAI patikrinama skelbimo tekste, balas automatiškai nužeminamas,
   jei citata fabrikuota ar nerasta; `temperature=0` nuoseklumui (žr.
   `docs/llm-reliability.md`)
@@ -85,8 +83,9 @@ lentele ir klaidų valdymo aprašymu — **`docs/architecture.md`**.
   Chromium, iki 3 šaltinių vienu metu per `ThreadPoolExecutor`) — šaltiniai
   aprašyti deklaratyviai `sources.yaml`, naujo šaltinio pridėjimui **nereikia
   Python kodo keisti**
-- 🔁 Automatinis retry su eksponentiniu backoff Claude API ir Playwright
-  laikinoms klaidoms (rate limit, tinklo triktys, 5xx) — `tenacity`
+- 🔁 Automatinis retry su eksponentiniu backoff: laikina Claude provider klaida
+  pakartoja tą patį request tame pačiame pokalbyje. Playwright klaida
+  kartojama scraperio lygyje per `tenacity`
 - 🔌 Circuit breaker šaltiniams — po 3 nuoseklių paleidimų nesėkmių šaltinis
   laikinai praleidžiamas (24h) vietoj beprasmio pakartotinio bandymo
 - 📬 Automatiškai siunčia rezultatų santrauką el. paštu (tik jei rasta atitikimų)
@@ -108,8 +107,9 @@ lentele ir klaidų valdymo aprašymu — **`docs/architecture.md`**.
 - 💰 Cost control — seen jobs praleidžiami prieš API kvietimą, max chars per
   skelbimą, max jobs per paleidimą, API kvietimai loginami manifeste (žr.
   `docs/cost-control.md`)
-- ✅ 187 testai (pytest), 92.9% coverage, realus DOM parsinimas su Chromium,
-  subprocess integracinis testas, `ruff` lint, CI workflow (žr. `docs/testing.md`)
+- ✅ Pytest suite su realiu DOM parsinimu per Chromium,
+  subprocess integracinis testas, coverage gate, `ruff` lint ir CI workflow
+  (žr. `docs/testing.md`)
 
 ## Quick Start
 
@@ -173,7 +173,7 @@ job_agent/
 ├── logging_config.py          # Struktūrizuotas (JSON/console) logging
 ├── scraper.py               # Playwright naršymo logika (generinė, sources.yaml pagrindu)
 ├── deduplicator.py          # Dublikatų šalinimas, seen_jobs.json valdymas
-├── ranker.py                 # Claude API vertinimas (agent loop, schema/grounding validacija)
+├── ranker.py                 # ThinHarness + Claude agentas (structured output, grounding)
 ├── format_email.py          # JSON → el. laiško tekstas/HTML
 ├── config.py                 # Konfigūracija iš env/.env
 ├── sources.yaml               # VIEŠA, generinė šaltinių konfigūracija (demo)
@@ -183,7 +183,7 @@ job_agent/
 ├── prompts/                   # Claude promptų šablonai (atskirai nuo kodo)
 ├── docs/                      # Visa detali dokumentacija (žr. lentelę aukščiau)
 ├── examples/                  # Demo įėjimo/išėjimo duomenys
-├── tests/                     # 173 pytest testų
+├── tests/                     # Pytest testų suite
 ├── .github/workflows/         # job-search.yml (cron) + ci.yml (lint/test)
 ├── LICENSE                    # MIT
 ├── SECURITY.md

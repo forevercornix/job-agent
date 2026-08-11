@@ -5,26 +5,28 @@ sąžiningas atsakymas: promptu jų "uždrausti" negalima - reikia struktūrini�
 apsaugų, kurios veikia NEPRIKLAUSOMAI nuo to, ar modelis "pakluso"
 instrukcijai. Šis projektas taiko kelis sluoksnius, veikiančius kartu:
 
-**1. Struktūrizuotas JSON išvesties formatas**
-Claude visada privalo grąžinti fiksuotos struktūros JSON:
+**1. Struktūrizuotas modelio išvesties formatas**
+`ThinHarness 0.6.0` siunčia Anthropic native JSON Schema išvesties užklausą ir grąžina Pydantic validuotą `RankResponse`:
 ```json
 {"score": 1-10, "reason": "...", "evidence": "...",
  "matched_requirements": [...], "missing_requirements": [...]}
 ```
-Ne laisvo teksto atsakymas, kurį reikėtų interpretuoti - griežta struktūra
-leidžia programiškai validuoti kiekvieną atsakymo dalį (žr. punktą 2 žemiau).
+Ne laisvo teksto atsakymas, kurį aplikacija pati parsina: `score`, netuščias
+`reason` ir `evidence` validuojami per `RankResponse`. Netinkama išvestis gauna
+iki dviejų ThinHarness corrective retry; tik išnaudojus juos grąžinamas saugus
+`score=0`. `matched_requirements`/`missing_requirements` sąmoningai lieka
+permissive ir po to tvarkomi `_coerce_string_list`, kad išliktų legacy elgesys.
 
-**2. JSON Schema validacija (dviguba)**
-- **Kodinė validacija** (`ranker._validate_schema`) - kiekvienas PRADINIS
-  modelio atsakymas tikrinamas, ar turi VISUS privalomus laukus (`score`,
-  `reason`, `evidence`) teisingais tipais. Jei modelis praleidžia lauką ar
-  grąžina netinkamą tipą → **schema validation failure** (klaida, `score=0`).
+**2. Struktūros validacija (dviguba)**
+- **Modelio išvestis** (`ranker.RankResponse`) - privalomi laukai ir jų tipai
+  validuojami ThinHarness structured-output cikle. Schema klaida dabar yra
+  pataisoma modelio run'o viduje, o ne iškart paverčiama `score=0`.
 - **Formalus kontraktas** (`schemas/rank_result.schema.json`, JSON Schema
   draft-07) - GALUTINIS (po apdorojimo) rezultatas papildomai validuojamas
   per `jsonschema` biblioteką prieš `ranker._validate_against_contract()`.
   Tai atskiras, versijuojamas dokumentas - "source of truth" modelio
   atsakymo struktūrai, kurio atitikimą realiai patikrina
-  `tests/test_schema_contract.py` (12 testų).
+  `tests/test_schema_contract.py`.
 
 **3. Grounding (evidence) reikalavimas**
 Kiekvienas balas privalo turėti `evidence` - trumpą (≤15 žodžių) TIESIOGINĘ
@@ -59,15 +61,16 @@ Konkretus scenarijus (aukštas balas + nepagrįsta citata):
 # Realiame skelbime apie tai NIEKUR neužsimenama.
 #
 # Rezultatas PO validacijos: score <= 3, grounded=False
-# (žr. tests/test_ranker.py::test_score_job_downgrades_high_score_with_fabricated_evidence)
+# (žr. tests/test_ranker.py::test_fabricated_evidence_downgrades_high_score)
 ```
 
-**5. Fallback ant nevalidaus atsakymo**
-Kiekvienas galimas nesėkmės taškas (API klaida, JSON parse klaida, schema
-validacijos klaida, agent loop iteracijų limitas) grąžina VIENODOS
-struktūros saugų rezultatą (`_error_result()`) - `score=0`, aiškus `reason`
-su klaidos priežastimi. Joks blogas atsakymas nesustabdo viso proceso ar
-nepalieka nenuspėjamos būsenos.
+**5. Retry ir fallback**
+Netinkama struktūrizuota išvestis taisoma iki dviejų kartų tame pačiame
+ThinHarness run'e. Laikinos provider klaidos (connection/timeout, HTTP 408,
+409, 425, 429 ar 5xx) gauna iki dviejų provider request retry tame pačiame
+pokalbyje. Auth, permission ir kitos non-retryable 4xx nekartojamos. Jau užbaigtas scraping
+įrankio kvietimas nekartojamas. Galutinė provider, output-validation ar capacity klaida vis tiek grąžina
+vienodos struktūros `_error_result()` su `score=0` ir nesustabdo kitų darbų.
 
 **6. Temperature=0**
 Sumažina atsitiktinį balo svyravimą, jei tas pats skelbimas vertinamas
@@ -76,11 +79,11 @@ tik nuoseklumą - modelis vis tiek gali klaidingai įvertinti atitikimą,
 tiesiog darys tai nuosekliau.
 
 **7. Testai promptų/išvesties kontraktui**
-`tests/test_ranker_validation.py` (22 testai) tikrina PAČIAS validacijos
-funkcijas izoliuotai: schema atmetimo atvejus, evidence substring/fuzzy
-atpažinimą, fabrikuotos citatos atmetimą. `tests/test_ranker.py` turi
-dedikuotą testą lygiai šiam scenarijui (aukštas balas + nepagrįsta
-citata → downgrade).
+`tests/test_ranker_validation.py` tikrina `RankResponse`, evidence ir sąrašų
+normalizavimo gryną logiką. `tests/test_ranker.py` leidžia realų ThinHarness
+ciklą su scripted `Model`/`ModelSession` fake ir tikrina tool, SSRF,
+structured-output retry, provider request retry, capacity, statistiką bei saugų
+fallback - ne Anthropic SDK mock'o call seką.
 
 **8. Eval harness** (`eval/`)
 15-30 rankiniu būdu pažymėtų skelbimų (`eval/dataset.json`) su expected_label

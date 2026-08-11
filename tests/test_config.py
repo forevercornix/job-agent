@@ -24,6 +24,13 @@ def test_get_profile_returns_demo_default_when_env_unset(monkeypatch):
     assert "Pavyzdinis kandidato profilis" in result
 
 
+def test_default_model_is_provider_qualified_for_thinharness(monkeypatch):
+    monkeypatch.delenv("CLAUDE_MODEL", raising=False)
+    reloaded = importlib.reload(config)
+
+    assert reloaded.CLAUDE_MODEL == "anthropic:claude-sonnet-4-6"
+
+
 def test_module_survives_missing_dotenv_dependency(monkeypatch):
     """
     Patikrina, kad config.py neluš, jei python-dotenv nėra įdiegtas

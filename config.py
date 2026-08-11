@@ -77,5 +77,5 @@ SEEN_JOBS_FILE = "seen_jobs.json"
 # Failas, į kurį rašomi rezultatai
 OUTPUT_FILE = "matched_jobs.json"
 
-# Claude API modelis
-CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-sonnet-4-6")
+# ThinHarness provider-qualified Claude modelis
+CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "anthropic:claude-sonnet-4-6")

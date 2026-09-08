@@ -1,5 +1,9 @@
 playwright>=1.44
-anthropic>=0.34
+# Viršutinė riba BŪTINA: 1.0 išmetė `temperature` iš Messages.create(), ir
+# neapribotas `>=0.34` tylomis įsitraukė 1.4.0 -> visi vertinimo kvietimai
+# krito su TypeError (2026-09-08 paleidimas). Major versiją kelti tik
+# sąmoningai, perskaičius changelog.
+anthropic>=1.4,<2
 python-dotenv>=1.0
 tenacity>=8.2
 pyyaml>=6.0

@@ -19,7 +19,9 @@ LLM RELIABILITY (žr. taip pat docs/llm-reliability.md):
   o ne tik pasitikima, kad modelis necituoja neegzistuojančio teksto
 - Downgrade taisyklė: jei evidence trūksta arba nerandama tekste, balas
   priverstinai nužeminamas (žr. DOWNGRADE_SCORE_CAP)
-- temperature=0 nuoseklumui
+- Visi API kvietimai eina per vieną _call_claude() funkciją, todėl preflight
+  patikra tikrina tą patį kwargs rinkinį, kurį naudoja realus vertinimas
+  (SDK 1.x išmetė `temperature` - anksčiau tai prasmukdavo pro preflight)
 
 Reikia ANTHROPIC_API_KEY aplinkos kintamojo arba pip install anthropic.
 """
@@ -141,28 +143,33 @@ TOOLS = [
     retry=retry_if_exception_type(RETRYABLE_EXCEPTIONS),
     reraise=True,
 )
-def _call_claude(system: str, messages: list, model: str, tools: list = None):
+def _call_claude(system: str, messages: list, model: str, tools: list = None, max_tokens: int = 1024):
     """
-    Kviečia Claude API su automatiniu retry laikinoms klaidoms (rate limit,
-    overload, tinklas).
+    VIENINTELIS kelias į client.messages.create() visame modulyje.
 
-    temperature=0: šis vertinimas yra SPRENDIMO priėmimo užduotis (balas
-    1-10), ne kūrybinio teksto generavimas - norime kuo NUOSEKLESNIO, kuo
-    MAŽIAU atsitiktinio elgesio. temperature=0 nepašalina galimo blogo
-    sprendimo (modelis vis tiek gali klaidingai įvertinti atitikimą), bet
-    sumažina atsitiktinį balo svyravimą, jei tas pats skelbimas būtų
-    vertinamas pakartotinai - naudinga atkuriamumui/derinimui.
+    Tai svarbu ne dėl grožio: kai `temperature` dingo iš SDK 1.x signatūros,
+    preflight patikra praėjo (ji kvietė API tiesiogiai, be `temperature`), o
+    visi 30 realių vertinimo kvietimų krito. Kol visi kvietimai eina per šią
+    funkciją, tokia signatūros klaida krenta jau preflight'e, PRIEŠ brangų
+    scraping'ą.
+
+    Retry - tik laikinoms klaidoms (rate limit, overload, tinklas).
+
+    PASTABA dėl determinizmo: anksčiau čia buvo `temperature=0` (vertinimas
+    yra sprendimo, ne kūrybos užduotis). SDK 1.x šio parametro nebepriima.
+    Nuoseklumą dabar užtikrina griežta JSON schema + grounding patikra
+    (_validate_schema, _is_evidence_grounded), ne sampling parametras.
     """
     kwargs = {
         "model": model,
-        "max_tokens": 1024,  # padidinta nuo 600 - realiame paleidime pastebėta
+        "max_tokens": max_tokens,  # padidinta nuo 600 - realiame paleidime pastebėta
         # JSON nutrūkimo klaidų ("Expecting value", "Expecting ',' delimiter"),
         # tikėtina dėl per mažos ribos su ilgesniais matched/missing_requirements
         # sąrašais ir ilgesniais reason/evidence laukais
-        "temperature": 0,
-        "system": system,
         "messages": messages,
     }
+    if system:
+        kwargs["system"] = system
     if tools:
         kwargs["tools"] = tools
     return client.messages.create(**kwargs)
@@ -174,16 +181,20 @@ def preflight_check(model="claude-sonnet-4-6") -> tuple:
     ATLIEKAMA PRIEŠ pradedant brangų scraping darbą (fail fast).
 
     Grąžina (True, None) jei viskas gerai, arba (False, klaidos_tekstas), jei ne.
+
+    Eina per _call_claude TYČIA - kad patikrintų ne tik raktą/tinklą, bet ir
+    tai, kad realiai naudojamas kwargs rinkinys tinka įdiegtai SDK versijai.
     """
     try:
-        client.messages.create(
+        _call_claude(
+            system=None,
+            messages=[{"role": "user", "content": "ping"}],
             model=model,
             max_tokens=1,
-            messages=[{"role": "user", "content": "ping"}],
         )
         return True, None
     except Exception as e:
-        return False, str(e)
+        return False, f"{type(e).__name__}: {e}"
 
 
 # Instrukcijos laikomos `system` parametre, atskirai nuo kandidato ir skelbimo

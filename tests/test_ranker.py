@@ -518,14 +518,15 @@ def test_rank_jobs_passes_through_evidence_to_job_dict(mock_score_job):
     assert matched[0]["match_evidence"] == "Reikalaujama Python patirtis"
 
 
-# --- Determinizmas (temperature=0) testai -----------------------------------
+# --- SDK kontrakto testai ----------------------------------------------------
 
 @patch("ranker.client")
-def test_call_claude_uses_temperature_zero(mock_client):
+def test_call_claude_does_not_pass_temperature(mock_client):
     """
-    Vertinimas yra sprendimo priėmimo, ne kūrybinio teksto generavimo užduotis -
-    temperature=0 sumažina atsitiktinį balo svyravimą pakartotinai vertinant
-    tą patį skelbimą.
+    REGRESIJOS testas realiam incidentui (2026-09-08): anthropic SDK 1.x
+    išmetė `temperature` iš Messages.create(), o requirements.txt turėjo
+    neapribotą `anthropic>=0.34`. Visi 30 vertinimo kvietimų krito su
+    TypeError, jobas baigėsi exit code 1 su 0 atitikmenų.
     """
     mock_client.messages.create.return_value = _mock_text_response(
         '{"score": 7, "reason": "...", "evidence": "..."}'
@@ -535,7 +536,24 @@ def test_call_claude_uses_temperature_zero(mock_client):
     ranker.score_job(job, candidate_profile="test")
 
     _, kwargs = mock_client.messages.create.call_args
-    assert kwargs["temperature"] == 0
+    assert "temperature" not in kwargs
+
+
+def test_call_claude_kwargs_match_installed_sdk_signature():
+    """
+    Mock'as priima BET KOKĮ kwarg, todėl vien mockinti testai signatūros
+    pokyčio nepagauna - būtent taip incidentas ir prasmuko pro žalią CI.
+    Čia tikrinama prieš REALIĄ įdiegtos SDK versijos signatūrą, be tinklo.
+    """
+    import inspect
+
+    import anthropic
+
+    sig = inspect.signature(anthropic.resources.messages.Messages.create)
+    used_kwargs = {"model", "max_tokens", "messages", "system", "tools"}
+
+    unsupported = used_kwargs - set(sig.parameters)
+    assert not unsupported, f"Įdiegta anthropic SDK nepriima šių kwargs: {sorted(unsupported)}"
 
 
 @patch("ranker.client")
@@ -609,11 +627,29 @@ def test_score_job_recovers_from_garbage_non_empty_text(mock_client):
 
 
 @patch("ranker.client")
-def test_preflight_check_does_not_require_temperature(mock_client):
-    """Preflight yra tik pasiekiamumo patikra ('ping') - temperature čia nesvarbu, netikriname."""
+def test_preflight_check_uses_same_kwargs_as_real_scoring(mock_client):
+    """
+    Preflight turi eiti per _call_claude, kad tikrintų TĄ PATĮ kwargs rinkinį,
+    kurį naudoja realus vertinimas. Anksčiau jis kvietė API tiesiogiai, todėl
+    `temperature` signatūros klaida praėjo žaliai ir jobas krito tik PO viso
+    scraping'o (350 skelbimų) - fail-fast neveikė.
+    """
     mock_client.messages.create.return_value = _mock_text_response("pong")
-    ok, err = ranker.preflight_check()
+
+    ok, _ = ranker.preflight_check()
+    _, preflight_kwargs = mock_client.messages.create.call_args
+    mock_client.reset_mock()
+
+    mock_client.messages.create.return_value = _mock_text_response(
+        '{"score": 7, "reason": "...", "evidence": "..."}'
+    )
+    ranker.score_job({"title": "X", "company": "Y", "snippet": "..."}, candidate_profile="test")
+    _, scoring_kwargs = mock_client.messages.create.call_args
+
     assert ok is True
+    # max_tokens tyčia skiriasi (preflight pigus), visa kita - tas pats rinkinys
+    assert set(scoring_kwargs) - set(preflight_kwargs) <= {"system", "tools"}
+    assert "temperature" not in preflight_kwargs
 
 
 # --- Tuščio atsakymo atkūrimo testai (realus gamybos radinys, 2026-07) -----
